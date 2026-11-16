@@ -11,10 +11,10 @@ Date: 2026-11-16
 | Product naming | User-facing text and assembly product metadata use Keypivo. Previous identifiers remain only for settings compatibility and single-instance coordination. |
 | Binary naming | `keypivo.exe`, `keypivo.dll`, and `keypivo.core.dll` use lowercase filenames. The package is `keypivo-win.zip`. |
 | Text checks | Application text, README, and documentation remain English-only and use Security key for the device. |
-| Automated tests | 47 cases compiled, including 15 switching-verification regressions and two settings-upgrade cases. The latest run was blocked at startup when Windows application control rejected `keypivo.tests.exe`. No assertions ran. |
+| Automated tests | All 47 application tests passed on GitHub's Windows runner, including 15 switching-verification regressions and two settings-upgrade cases. Local execution remains blocked by Windows application control; the remote run supplies the runtime evidence. |
 | Store publishing guards | Seven fake-CLI tests passed locally: successful submission, missing first publication, pending draft, duplicate version, wrong identity, missing credentials, and query failure. No Store API was called. |
 | MSIX packaging | A self-contained x64 package with a CI-only identity passed Windows SDK MakeAppx semantic validation and payload/manifest/logo checks locally. Store identity and certification are still required. |
-| GitHub CI | Configured to run the application tests, Store guard tests, and MSIX validation on Windows for PRs to develop/main. Remote run results are recorded on the PR. |
+| GitHub CI | [Run 43847629036](https://github.com/rubyu/keypivo/actions/runs/43847629036) passed: 47/47 application tests, 7/7 publishing guard tests, and MSIX build/validation. Store submission was correctly skipped on the PR. Latest checks are on [PR #1](https://github.com/rubyu/keypivo/pull/1). |
 | Native GUI and actual USB switching | Pending verification in an environment that permits the generated assemblies to run. |
 | usbipd CLI | The standard installation was previously confirmed as version 5.3.0, with working state output and supported commands. It is not on PATH. |
 
@@ -66,7 +66,7 @@ Fifteen switching-verification regressions cover:
 - A new action superseding an old pending confirmation.
 - State-query failures remaining visible errors.
 
-The regression tests use shortened polling and stability intervals. Production defaults are a 10-second verification deadline, a 500 ms pause between reads, and a one-second stability window. Runtime results remain unverified because of the application-control block above.
+The regression tests use shortened polling and stability intervals. Production defaults are a 10-second verification deadline, a 500 ms pause between reads, and a one-second stability window. These tests passed remotely; actual hardware switching and the installed Store package still require manual verification.
 
 Run:
 
