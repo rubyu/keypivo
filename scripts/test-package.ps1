@@ -13,7 +13,7 @@ $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Packag
 try {
     $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     foreach ($required in @('keypivo.exe', 'keypivo.dll', 'keypivo.core.dll', 'keypivo.runtimeconfig.json',
-        'coreclr.dll', 'System.Private.CoreLib.dll', 'AppxManifest.xml', 'AppxBlockMap.xml',
+        'coreclr.dll', 'System.Private.CoreLib.dll', 'LICENSE', 'AppxManifest.xml', 'AppxBlockMap.xml',
         'Assets/StoreLogo.png', 'Assets/Square44x44Logo.png', 'Assets/Square150x150Logo.png')) {
         if ($required -cnotin $names) { throw "Package is missing: $required" }
     }
@@ -40,5 +40,5 @@ try {
             finally { $image.Dispose() }
         } finally { $stream.Dispose() }
     }
-    Write-Output 'MSIX verification passed: identity, entry point, runtime, capabilities, and logos.'
+    Write-Output 'MSIX verification passed: identity, entry point, runtime, license, capabilities, and logos.'
 } finally { $archive.Dispose() }
