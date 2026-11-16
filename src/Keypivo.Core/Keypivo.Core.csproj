@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>keypivo.core</AssemblyName>
+    <RootNamespace>Keypivo.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
