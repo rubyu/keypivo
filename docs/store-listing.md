@@ -34,15 +34,13 @@ Testing requires Windows, usbipd-win, a running WSL2 distribution, and a USB sec
 
 ## Screenshots
 
-These original user-provided captures document the UI:
+Use the supplied Keypivo image for the Store listing:
 
 | Image | Size | Caption |
 | --- | --- | --- |
-| [Menu](images/menu.png) | 376 × 387 | View your security key status and switch from the tray. |
-| [Settings](images/settings.png) | 446 × 505 | Choose device IDs and popup placement. |
-| [Tray](images/tray.png) | 593 × 354 | Keep Keypivo close at hand in the system tray. |
+| [Keypivo](images/keypivo.png) | 1672 × 941 | View your security key status and switch from the tray. |
 
-These cropped reference images are too small for a desktop Store listing. Capture the actual app on a desktop image of at least **1366 × 768**, preferably 1920 × 1080, and save as PNG. Include at least one valid screenshot. A connected-state capture would also demonstrate the primary switching function. Avoid capturing personal notifications or unrelated documents. See [Microsoft's screenshot requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images).
+This PNG meets the desktop minimum dimensions of **1366 × 768**. Submit it as the listing screenshot; only this image is maintained in the repository. See [Microsoft's screenshot requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images).
 
 ## Privacy and support
 

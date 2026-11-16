@@ -14,18 +14,17 @@ On GitHub, open Settings > Rules > Rulesets (or Branches) and protect `develop` 
 
 1. Register as a Windows app developer in [Partner Center](https://storedeveloper.microsoft.com/).
 2. Under Apps and games > New product, choose **MSIX or PWA app** and reserve **Keypivo**.
-3. Open the app's Product management > Product identity page. Copy the values exactly; do not invent the publisher CN or use the friendly app name as the package identity.
-4. In [GitHub Actions variables](https://github.com/rubyu/keypivo/settings/variables/actions), create the following repository variables:
+3. The reserved product identity supplied by the publisher is already recorded in [packaging/store.json](../packaging/store.json) and the package manifest. These are public package identifiers, not credentials. Confirm them against Product management > Product identity:
 
-| Variable | Value |
+| Field | Configured value |
 | --- | --- |
-| `STORE_APP_ID` | The Store product ID, normally starting with `9`. |
-| `STORE_IDENTITY_NAME` | `Package/Identity/Name` from Partner Center. |
-| `STORE_PUBLISHER` | `Package/Identity/Publisher`, including `CN=`. |
-| `STORE_PUBLISHER_DISPLAY_NAME` | `Package/Properties/PublisherDisplayName`. |
-| `STORE_PUBLISH_ENABLED` | Leave unset or set to `false` until the first publication and setup below are complete. |
+| Store product ID | `9P9S5NCN2DQ4` |
+| Package/Identity/Name | `24880rubyu.Keypivo` |
+| Package/Identity/Publisher | `CN=4A475315-607B-42C7-B194-4DB633BAC95D` |
+| Package/Properties/PublisherDisplayName | `rubyu` |
 
-5. Re-run a CI run on `develop` after setting the identity variables. Download the `keypivo-msix-<commit>` artifact. Its MSIX is the package for the first manual submission. If all three identity variables are absent, CI instead uses `Keypivo.Validation`; that package is only for build validation and must not be submitted. Partial identity configuration fails the build.
+4. In [GitHub Actions variables](https://github.com/rubyu/keypivo/settings/variables/actions), leave `STORE_PUBLISH_ENABLED` unset or `false` until the first publication and credential setup below are complete. There is no need to duplicate the identity values as GitHub variables.
+5. Download the `keypivo-msix-<commit>` artifact from a successful CI run on `develop` using the configured identity above. Its MSIX can be used for the first manual submission. Early CI runs used `Keypivo.Validation`; those older packages are only for validation and must not be submitted. Prefer the latest successful run.
 6. Complete the first submission in Partner Center: availability and pricing, app properties, age rating, English listing, screenshots, privacy-policy URL, package upload, and certification notes. Upload the MSIX and set publication to occur when certification completes. The Store signs the package; this unsigned upload package is not intended for direct installation.
 7. Test the installed Store package, including tray startup, settings persistence, `usbipd` discovery, UAC consent for bind/unbind, and Windows/WSL switching. Packaging validation alone does not establish this behavior. Finish the first publication so the app is live before enabling API updates.
 
@@ -59,17 +58,18 @@ If a submission is already pending, finish it or explicitly discard it in Partne
 
 ## Local packaging
 
-Install the .NET 10 SDK and Windows 10/11 SDK, then use the actual identity from Partner Center:
+Install the .NET 10 SDK and Windows 10/11 SDK, then use the checked-in Store identity:
 
 ```powershell
+$store = Get-Content -LiteralPath packaging/store.json -Raw | ConvertFrom-Json
 ./scripts/package-store.ps1 `
-  -IdentityName '12345.YourReservedIdentity' `
-  -Publisher 'CN=your-publisher-identity' `
-  -PublisherDisplayName 'Your publisher display name' `
+  -IdentityName $store.identityName `
+  -Publisher $store.publisher `
+  -PublisherDisplayName $store.publisherDisplayName `
   -Version '1.0.0.0'
 ```
 
-Those example identity values are placeholders. The script keeps MakeAppx semantic validation enabled and checks the packaged entry point, runtime, capabilities, identity, and logo dimensions. It refuses to overwrite an existing package. `-Architecture arm64` is available for separate packaging; the current automated release targets x64 only. Supporting both architectures should use a tested bundle before broadening the Store release.
+The script keeps MakeAppx semantic validation enabled and checks the packaged entry point, runtime, capabilities, identity, and logo dimensions. It refuses to overwrite an existing package. `-Architecture arm64` is available for separate packaging; the current automated release targets x64 only. Supporting both architectures should use a tested bundle before broadening the Store release.
 
 ## Listing material
 

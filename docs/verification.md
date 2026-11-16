@@ -13,12 +13,12 @@ Date: 2026-11-16
 | Text checks | Application text, README, and documentation remain English-only and use Security key for the device. |
 | Automated tests | All 47 application tests passed on GitHub's Windows runner, including 15 switching-verification regressions and two settings-upgrade cases. Local execution remains blocked by Windows application control; the remote run supplies the runtime evidence. |
 | Store publishing guards | Seven fake-CLI tests passed locally: successful submission, missing first publication, pending draft, duplicate version, wrong identity, missing credentials, and query failure. No Store API was called. |
-| MSIX packaging | A self-contained x64 package with a CI-only identity passed Windows SDK MakeAppx semantic validation and payload/manifest/logo checks locally. Store identity and certification are still required. |
+| MSIX packaging | Self-contained x64 packages passed Windows SDK MakeAppx semantic validation and payload/manifest/logo checks. A version 1.0.0.0 package was also built using the supplied Store identity `24880rubyu.Keypivo` and publisher `CN=4A475315-607B-42C7-B194-4DB633BAC95D`. Store certification is still required. |
 | GitHub CI | [Run 43847629036](https://github.com/rubyu/keypivo/actions/runs/43847629036) passed: 47/47 application tests, 7/7 publishing guard tests, and MSIX build/validation. Store submission was correctly skipped on the PR. Latest checks are on [PR #1](https://github.com/rubyu/keypivo/pull/1). |
 | Native GUI and actual USB switching | Pending verification in an environment that permits the generated assemblies to run. |
 | usbipd CLI | The standard installation was previously confirmed as version 5.3.0, with working state output and supported commands. It is not on PATH. |
 
-No application-control settings, certificate trust settings, or USB connection settings were changed during verification. The user supplied screenshots of the actual menu, Settings window, and tray icon; they document those visual states but do not establish switching behavior. A successful build does not establish runtime correctness.
+No application-control settings, certificate trust settings, or USB connection settings were changed during verification. The supplied listing image documents the menu presentation but does not establish switching behavior. A successful build does not establish runtime correctness.
 
 ## Automated coverage
 

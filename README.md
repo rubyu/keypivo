@@ -2,7 +2,7 @@
 
 A small Windows tray app for switching a security key between Windows and WSL2. Built with C# and WinForms. The interface and documentation are English-only.
 
-![Keypivo tray menu](docs/images/menu.png)
+![Keypivo tray menu](docs/images/keypivo.png)
 
 ## Requirements
 

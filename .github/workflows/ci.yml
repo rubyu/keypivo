@@ -29,6 +29,9 @@ jobs:
     timeout-minutes: 20
     outputs:
       package-file: ${{ steps.package.outputs.file }}
+      app-id: ${{ steps.package.outputs.app-id }}
+      identity-name: ${{ steps.package.outputs.identity-name }}
+      publisher: ${{ steps.package.outputs.publisher }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,30 +52,20 @@ jobs:
         run: ./scripts/test-store-publishing.ps1
       - name: Build and validate MSIX
         id: package
-        env:
-          STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
-          STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
-          STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.STORE_PUBLISHER_DISPLAY_NAME }}
         run: |
-          $identity = $env:STORE_IDENTITY_NAME
-          $publisher = $env:STORE_PUBLISHER
-          $displayName = $env:STORE_PUBLISHER_DISPLAY_NAME
-          $values = @($identity, $publisher, $displayName)
-          $configured = @($values | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count
-          if ($configured -eq 0) {
-            $identity = 'Keypivo.Validation'
-            $publisher = 'CN=Keypivo CI'
-            $displayName = 'Keypivo'
-            'Validation identity: this package is not for Store submission.' >> $env:GITHUB_STEP_SUMMARY
-          } elseif ($configured -ne 3) {
-            throw 'Set all three STORE_IDENTITY_NAME, STORE_PUBLISHER, and STORE_PUBLISHER_DISPLAY_NAME variables.'
+          $config = Get-Content -LiteralPath packaging/store.json -Raw | ConvertFrom-Json
+          foreach ($value in @($config.appId, $config.identityName, $config.publisher, $config.publisherDisplayName)) {
+            if ([string]::IsNullOrWhiteSpace($value) -or $value -match '[\r\n]') { throw 'Invalid Store identity configuration.' }
           }
           $run = [long]$env:GITHUB_RUN_NUMBER
           $minor = [long][Math]::Floor($run / 65536)
           $build = $run % 65536
           $version = "1.$minor.$build.0"
-          ./scripts/package-store.ps1 -IdentityName $identity -Publisher $publisher -PublisherDisplayName $displayName -Version $version
+          ./scripts/package-store.ps1 -IdentityName $config.identityName -Publisher $config.publisher -PublisherDisplayName $config.publisherDisplayName -Version $version
           "file=keypivo-$version-x64.msix" >> $env:GITHUB_OUTPUT
+          "app-id=$($config.appId)" >> $env:GITHUB_OUTPUT
+          "identity-name=$($config.identityName)" >> $env:GITHUB_OUTPUT
+          "publisher=$($config.publisher)" >> $env:GITHUB_OUTPUT
           "Package version: $version (x64)" >> $env:GITHUB_STEP_SUMMARY
       - name: Upload MSIX
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -114,9 +107,9 @@ jobs:
       - name: Submit the tested package
         env:
           PACKAGE_FILE: ${{ needs.build.outputs.package-file }}
-          STORE_APP_ID: ${{ vars.STORE_APP_ID }}
-          STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
-          STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+          STORE_APP_ID: ${{ needs.build.outputs.app-id }}
+          STORE_IDENTITY_NAME: ${{ needs.build.outputs.identity-name }}
+          STORE_PUBLISHER: ${{ needs.build.outputs.publisher }}
           PARTNER_CENTER_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
           PARTNER_CENTER_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
           PARTNER_CENTER_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
