@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keypivo.Core/Keypivo.Core.csproj" />
+    <Project Path="src/Keypivo/Keypivo.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keypivo.Tests/Keypivo.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>keypivo</AssemblyName>
+    <RootNamespace>Keypivo</RootNamespace>
+    <AssemblyTitle>Keypivo</AssemblyTitle>
+    <Description>Security key tray switcher</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Keypivo.Core/Keypivo.Core.csproj" />
+  </ItemGroup>
+</Project>

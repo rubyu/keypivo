@@ -1,0 +1,219 @@
+using Keypivo.Core;
+
+namespace Keypivo;
+
+internal sealed class TrayApplicationContext : ApplicationContext
+{
+    private readonly SwitchController _controller;
+    private readonly SettingsStore _store;
+    private AppSettings _settings;
+    private readonly StatusForm _form = new();
+    private readonly TrayIcons _icons = new();
+    private readonly NotifyIcon _tray;
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 2000 };
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool _busy;
+    private bool _refreshing;
+    private bool _editingSettings;
+    private bool _closing;
+    private bool _notificationsEnabled;
+    private Exception? _lastError;
+    private (ConnectionState State, string? InstanceId, string? BusId)? _lastNotification;
+
+    public TrayApplicationContext(SwitchController controller, SettingsStore store, SettingsLoadResult loaded, bool showWindow)
+    {
+        _controller = controller;
+        _store = store;
+        _settings = loaded.Settings;
+        _tray = new NotifyIcon { Text = "Keypivo", Icon = _icons.For(ConnectionState.Checking), Visible = true };
+        _tray.MouseClick += (_, e) =>
+        {
+            if (e.Button is MouseButtons.Left or MouseButtons.Right) ShowStatus();
+        };
+        _tray.BalloonTipClicked += (_, _) => ShowStatus();
+        _form.SwitchRequested += async () => await RunActionAsync(SwitchAction.Toggle);
+        _form.RefreshRequested += async () => await RefreshAsync(clearError: true);
+        _form.SettingsRequested += async () => await ShowSettingsAsync();
+        _form.ExitRequested += () => ExitThread();
+        _form.DetailsRequested += ShowDetails;
+        _controller.SnapshotChanged += OnSnapshot;
+        _controller.VerificationRecovered += OnVerificationRecovered;
+        _timer.Tick += async (_, _) => await RefreshAsync();
+
+        _ = _form.Handle;
+        Render();
+        _form.BeginInvoke((Action)(async () =>
+        {
+            await RefreshAsync();
+            if (_closing) return;
+            _notificationsEnabled = true;
+            NotifyState(show: !loaded.RecoveredFromError);
+            if (loaded.RecoveredFromError)
+                _tray.ShowBalloonTip(5000, "Keypivo", "Settings could not be loaded. Default settings are in use.", ToolTipIcon.Warning);
+            if (showWindow) ShowStatus();
+            _timer.Start();
+        }));
+    }
+
+    private void ShowStatus()
+    {
+        if (!_closing && !_editingSettings) _form.ShowAt(_settings.Position);
+    }
+
+    private async Task RefreshAsync(bool clearError = false)
+    {
+        if (_busy || _refreshing || _editingSettings || _closing) return;
+        _refreshing = true;
+        if (clearError) _lastError = null;
+        Render();
+        try { await _controller.RefreshAsync(_lifetime.Token); }
+        catch (OperationCanceledException) when (_closing) { }
+        finally
+        {
+            _refreshing = false;
+            if (!_closing) Render();
+        }
+    }
+
+    private async Task RunActionAsync(SwitchAction action)
+    {
+        if (_busy || _refreshing || _editingSettings || _closing) return;
+        _busy = true;
+        _lastError = null;
+        Render();
+        try { await _controller.ExecuteAsync(action, _lifetime.Token); }
+        catch (OperationCanceledException) when (_closing) { }
+        catch (Exception exception)
+        {
+            _lastError = exception;
+            if (!_closing)
+            {
+                var detail = exception is SwitchVerificationTimeoutException
+                    ? "Change not confirmed yet. Status checks will continue automatically."
+                    : $"The operation could not be completed.\nCurrent state: {StatePresentation.Title(_controller.Current.State)}.";
+                _tray.ShowBalloonTip(6000, "Keypivo", detail, ToolTipIcon.Warning);
+                ShowStatus();
+            }
+        }
+        finally
+        {
+            _busy = false;
+            if (!_closing) { Render(); NotifyState(show: _lastError is null); }
+        }
+    }
+
+    private async Task ShowSettingsAsync()
+    {
+        if (_busy || _refreshing || _editingSettings || _closing) return;
+        _editingSettings = true;
+        _form.KeepOpen = true;
+        DialogResult result;
+        try
+        {
+            var device = _controller.Current.Device;
+            using var dialog = new SettingsForm(_settings,
+                device is not null && (device.IsShared || device.IsForced), ApplySettingsAsync) { Icon = _tray.Icon };
+            result = dialog.ShowDialog(_form);
+        }
+        finally
+        {
+            _editingSettings = false;
+            _form.KeepOpen = false;
+        }
+        if (_closing) return;
+        Render();
+        ShowStatus();
+        if (result == DialogResult.Retry) await RunActionAsync(SwitchAction.Unshare);
+    }
+
+    private async Task ApplySettingsAsync(AppSettings settings)
+    {
+        settings = settings.Normalize();
+        // Saving must succeed before the running configuration changes.
+        _store.Save(settings);
+        _settings = settings;
+        _lastError = null;
+        var filter = settings.ToFilter();
+        if (filter != _controller.Filter) await _controller.UpdateFilterAsync(filter, _lifetime.Token);
+        // Selecting a different key is not a USB connection transition.
+        NotifyState(show: false);
+        Render();
+    }
+
+    private void ShowDetails()
+    {
+        var detail = _lastError?.Message ?? _controller.Current.Error;
+        if (string.IsNullOrWhiteSpace(detail)) return;
+        _form.KeepOpen = true;
+        try { MessageBox.Show(_form, detail, "Details — Keypivo", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        finally { _form.KeepOpen = false; }
+    }
+
+    private void OnSnapshot(DeviceSnapshot snapshot)
+    {
+        if (_closing) return;
+        Render();
+        if (!_busy && !_editingSettings && _notificationsEnabled && !_controller.IsConfirmingCurrentState)
+            NotifyState(show: true);
+    }
+
+    private void OnVerificationRecovered(SwitchVerificationTimeoutException timeout, DeviceSnapshot confirmed)
+    {
+        if (_closing) return;
+        // Only this verification warning can be cleared by a later successful observation.
+        if (ReferenceEquals(_lastError, timeout)) _lastError = null;
+        // The first matching key may now differ from the key whose switch just completed.
+        // Report that operation once, then baseline the current selection to avoid a duplicate balloon.
+        NotifyState(show: false);
+        if (_notificationsEnabled)
+            _tray.ShowBalloonTip(4000, "Keypivo", $"Security key · {StatePresentation.Title(confirmed.State)}", ToolTipIcon.Info);
+    }
+
+    private void NotifyState(bool show)
+    {
+        var snapshot = _controller.Current;
+        var identity = (snapshot.State, snapshot.Device?.InstanceId, snapshot.Device?.BusId);
+        if (_lastNotification == identity) return;
+        _lastNotification = identity;
+        if (!show) return;
+        var icon = snapshot.State is ConnectionState.Error or ConnectionState.ToolMissing ? ToolTipIcon.Warning : ToolTipIcon.Info;
+        _tray.ShowBalloonTip(4000, "Keypivo", $"Security key · {StatePresentation.Title(snapshot.State)}", icon);
+    }
+
+    private void Render()
+    {
+        var snapshot = _controller.Current;
+        _tray.Icon = _icons.For(_busy ? ConnectionState.Checking : snapshot.State);
+        _tray.Text = $"Keypivo — {(_busy ? "Switching…" : StatePresentation.Title(snapshot.State))}";
+        _form.Render(snapshot, _busy, _refreshing, _lastError?.Message, _tray.Icon,
+            unconfirmed: _lastError is SwitchVerificationTimeoutException);
+    }
+
+    protected override void ExitThreadCore()
+    {
+        _closing = true;
+        _timer.Stop();
+        _lifetime.Cancel();
+        _tray.Visible = false;
+        _form.AllowClose = true;
+        _form.Close();
+        base.ExitThreadCore();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _closing = true;
+            _lifetime.Cancel();
+            _controller.SnapshotChanged -= OnSnapshot;
+            _controller.VerificationRecovered -= OnVerificationRecovered;
+            _timer.Dispose();
+            _tray.Dispose();
+            _form.Dispose();
+            _icons.Dispose();
+            _lifetime.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+}
