@@ -53,3 +53,4 @@ If several connected devices match, Keypivo selects the first one. Changing the 
 - [Development and packaging](docs/development.md)
 - [Microsoft Store publishing](docs/store-publishing.md)
 - [Privacy](docs/privacy.md)
+- [MIT License](LICENSE)
