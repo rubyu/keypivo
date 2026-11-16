@@ -35,9 +35,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 
     Copy-Item -LiteralPath 'README.md' -Destination $publishPath
-    $docsPath = Join-Path $publishPath 'docs'
-    New-Item -ItemType Directory -Path $docsPath -Force | Out-Null
-    Copy-Item -LiteralPath 'docs\verification.md' -Destination $docsPath
+    Copy-Item -LiteralPath 'docs' -Destination $publishPath -Recurse
     $zipPath = Join-Path $projectRoot 'artifacts\keypivo-win.zip'
     Compress-Archive -Path (Join-Path $publishPath '*') -DestinationPath $zipPath -Force
     Write-Output "Package: $zipPath"
