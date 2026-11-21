@@ -39,8 +39,11 @@ Returning to Windows keeps the key shared. To remove sharing, first switch to Wi
 | Vendor ID (VID) | `1050` | Four hexadecimal digits identifying the device vendor. |
 | Product ID (PID) | Empty | Optional four-digit hexadecimal ID. Leave empty to match any product from the selected vendor. |
 | Display position | Bottom right | Show the menu and Settings at the bottom right or center of the primary display. |
+| Start at sign-in | On | Start Keypivo in the tray when you sign in to Windows, after the app has been opened once. |
 
 If several connected devices match, Keypivo selects the first one. Changing the IDs does not disconnect a key that is already attached.
+
+To turn off automatic startup, uncheck **Start at sign-in** and select **Save**. If Windows has disabled startup, use **Open Windows startup settings** to enable it again.
 
 ## Troubleshooting
 

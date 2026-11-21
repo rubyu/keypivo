@@ -11,6 +11,8 @@ dotnet run --project src/Keypivo -c Release --no-build -- --show
 
 `--show` opens the tray menu immediately on startup.
 
+Sign-in startup uses the MSIX package's Windows startup task. It is unavailable in unpackaged development runs; native UI tests use a simulated startup service and do not alter the PC's startup settings.
+
 ## Tests
 
 The application tests use a console runner:
