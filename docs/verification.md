@@ -21,6 +21,8 @@ Popup checks exercise native foreground focus and ordering above another topmost
 
 Polling checks exercise the application context with a delayed fake device read. Unchanged automatic reads must leave controls enabled and cause no menu or setup layout events. A user action waits for a pending read and runs once; explicit refresh, setup navigation, changed snapshots, and shutdown remain functional.
 
+Startup UI checks use a simulated Windows startup service: on/off save, cancellation, unchanged settings, user/policy restrictions, read and update failures, and concurrent external changes. They never register a startup task on the test PC. Package checks require exactly one default-enabled `KeypivoStartup` task targeting `keypivo.exe` and reject immediate-install registration.
+
 Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos. Publishing guard tests reject invalid submissions without using Store credentials.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
@@ -48,5 +50,7 @@ Use the installed package on Windows with a security key and WSL2. Automated tes
 10. Put the tray icon in the hidden-icons overflow. Left-click and right-click it repeatedly: Keypivo must open in front, receive keyboard focus, and dismiss on an outside click or Escape. Repeat with the icon directly on the taskbar. While instructions stay open, switching to PowerShell must leave PowerShell in front; reopening Keypivo must bring the instructions forward again. Confirm Settings remains usable.
 11. Attach the key to WSL. The menu, notification, and tray tooltip must say **Connected to WSL**. Detach it and confirm **Available on Windows** appears again.
 12. Leave the menu and each setup page open across several two-second status checks. Buttons must not flash or lose keyboard focus, and the window must not pulse or move. Actual state changes and explicit actions must still update the display.
+13. Install the Store package and open it once. Verify **Start at sign-in** is checked. Sign out and back in: Keypivo should start in the tray without opening the menu or changing USB ownership. Uncheck the setting, Save, and repeat: the app should no longer start. Enable it again and confirm the next sign-in starts it.
+14. Disable Keypivo in Windows Settings > Apps > Startup. Reopen Keypivo Settings: the checkbox must show the Windows state, and the Windows-settings link must allow the user to re-enable it. Confirm that relaunches and updates preserve the disabled state. Test policy-controlled enabled/disabled states where available.
 
 OpenPGP and SSH authentication are separate checks. Keypivo does not generate keys, request PINs, or sign data. Store certification remains a separate review.

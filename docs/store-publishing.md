@@ -30,6 +30,8 @@ On GitHub, open Settings > Rules > Rulesets (or Branches) and protect `develop` 
 
 The manifest declares `runFullTrust` for the desktop app. Package validation rejects `allowElevation`. Keypivo runs at normal user privileges and never launches an administrator process; users perform installation and sharing commands outside the app. Use the current [certification notes](store-listing.md#certification-notes) when submitting this version. Address certification feedback before enabling automatic releases.
 
+The package declares a default-enabled `windows.startupTask`. After the app's first launch, Windows starts it in the tray at sign-in. **Start at sign-in** in Settings controls the Windows task directly; Windows user and policy restrictions remain authoritative. No extra restricted capability or immediate-install registration is requested. See [Microsoft's startup-task documentation](https://learn.microsoft.com/en-us/uwp/api/windows.applicationmodel.startuptask).
+
 ## API credentials
 
 1. Associate a Microsoft Entra tenant with the Partner Center account.

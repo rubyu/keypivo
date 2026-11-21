@@ -31,6 +31,22 @@ try {
     foreach ($required in @('runFullTrust')) {
         if ($required -notin $capabilities) { throw "Missing desktop capability: $required" }
     }
+    $namespaces = [Xml.XmlNamespaceManager]::new($manifest.NameTable)
+    $namespaces.AddNamespace('p', 'http://schemas.microsoft.com/appx/manifest/foundation/windows10')
+    $namespaces.AddNamespace('desktop', 'http://schemas.microsoft.com/appx/manifest/desktop/windows10')
+    $startupExtensions = $manifest.SelectNodes('/p:Package/p:Applications/p:Application/p:Extensions/desktop:Extension[@Category="windows.startupTask"]', $namespaces)
+    if ($startupExtensions.Count -ne 1) { throw 'Exactly one sign-in startup task is required.' }
+    $startupExtension = $startupExtensions[0]
+    $startupTask = $startupExtension.SelectSingleNode('desktop:StartupTask', $namespaces)
+    if ($null -eq $startupTask -or $startupTask.GetAttribute('TaskId') -cne 'KeypivoStartup' -or
+        $startupTask.GetAttribute('Enabled') -cne 'true' -or $startupTask.GetAttribute('DisplayName') -cne 'Keypivo' -or
+        $startupExtension.GetAttribute('Executable') -cne 'keypivo.exe' -or
+        $startupExtension.GetAttribute('EntryPoint') -cne 'Windows.FullTrustApplication') {
+        throw 'Incorrect default-enabled startup task declaration.'
+    }
+    if ($startupTask.Attributes | Where-Object LocalName -eq 'ImmediateRegistration') {
+        throw 'Startup must use normal first-launch registration.'
+    }
     Add-Type -AssemblyName System.Drawing
     foreach ($asset in @(@('StoreLogo.png', 50), @('Square44x44Logo.png', 44), @('Square150x150Logo.png', 150))) {
         $entry = $archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq "Assets/$($asset[0])" } | Select-Object -First 1
@@ -41,5 +57,5 @@ try {
             finally { $image.Dispose() }
         } finally { $stream.Dispose() }
     }
-    Write-Output 'MSIX verification passed: identity, entry point, runtime, license, capabilities, and logos.'
+    Write-Output 'MSIX verification passed: identity, entry point, runtime, license, capabilities, sign-in startup, and logos.'
 } finally { $archive.Dispose() }
