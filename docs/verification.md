@@ -17,6 +17,8 @@ Application coverage includes:
 
 Native UI checks cover setup routing, command visibility, copy guards, incomplete-check feedback, returning to the normal menu, menu actions, and control bounds. Background confirmation leaves instructions visible until the user checks explicitly. There is no separate completion page or switching action on an instruction page.
 
+Popup checks exercise native foreground focus and ordering above another topmost window, reopening, dismissal, and releasing topmost status while instructions or Settings stay open. The attached state must read **Connected to WSL** in the menu and the shared text used by notifications and the tray tooltip. These checks use ordinary test windows; the Windows notification-area overflow still requires the manual check below.
+
 Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos. Publishing guard tests reject invalid submissions without using Store credentials.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
@@ -41,5 +43,7 @@ Use the installed package on Windows with a security key and WSL2. Automated tes
 7. Verify VID/PID filtering, first-device selection, saved display position, state-change notifications, and Exit leaving USB ownership unchanged. A second launch must not create another running instance.
 8. Check keyboard navigation, high-contrast mode, and 100%, 150%, and 200% display scaling for readable, unclipped controls.
 9. Disconnect a key after a switching command. Confirmation must time out without repeating the command or operating on another key. Reconnecting the original key in the expected state should clear the confirmation warning after stable polling. A genuine command failure must remain distinct from a confirmation timeout.
+10. Put the tray icon in the hidden-icons overflow. Left-click and right-click it repeatedly: Keypivo must open in front, receive keyboard focus, and dismiss on an outside click or Escape. Repeat with the icon directly on the taskbar. While instructions stay open, switching to PowerShell must leave PowerShell in front; reopening Keypivo must bring the instructions forward again. Confirm Settings remains usable.
+11. Attach the key to WSL. The menu, notification, and tray tooltip must say **Connected to WSL**. Detach it and confirm **Available on Windows** appears again.
 
 OpenPGP and SSH authentication are separate checks. Keypivo does not generate keys, request PINs, or sign data. Store certification remains a separate review.

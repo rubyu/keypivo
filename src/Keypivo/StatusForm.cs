@@ -77,7 +77,7 @@ internal sealed class StatusForm : Form
         });
         _status = new Label
         {
-            Text = "Checking…", AutoSize = true, MaximumSize = new Size(282, 0),
+            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(282, 0),
             ForeColor = AppTheme.Muted, Margin = new Padding(0, 3, 0, 0)
         };
         state.Controls.Add(_status);
@@ -96,7 +96,13 @@ internal sealed class StatusForm : Form
         _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
         _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
         _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
-        Deactivate += (_, _) => { if (!KeepOpen && !IsSetupVisible) Hide(); };
+        Deactivate += (_, _) =>
+        {
+            // Instructions may stay open behind PowerShell, but must not remain above it.
+            TopMost = false;
+            if (!KeepOpen && !IsSetupVisible) Hide();
+        };
+        VisibleChanged += (_, _) => { if (!Visible) TopMost = false; };
         SizeChanged += (_, _) => { if (Visible) Place(); };
     }
 
@@ -157,8 +163,12 @@ internal sealed class StatusForm : Form
     {
         _position = position;
         Place();
+        // The notification-area overflow is itself topmost. Raise the popup into
+        // that band on explicit opening; deactivation and hiding release it.
+        TopMost = true;
         if (!Visible) Show();
         Place();
+        BringToFront();
         Activate();
         if (IsSetupVisible) _setupPage.FocusPrimary();
         else if (!_switch.Focus()) _refresh.Focus();
