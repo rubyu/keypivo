@@ -1,6 +1,6 @@
 # Microsoft Store publishing
 
-Keypivo is packaged as an x64 MSIX containing its .NET runtime. usbipd-win and WSL2 remain separately installed prerequisites. The portable ZIP is still available for use outside the Store.
+Keypivo is packaged as an x64 MSIX containing its .NET runtime. usbipd-win and WSL2 remain separately installed prerequisites.
 
 ## Branches and CI
 
