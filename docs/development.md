@@ -17,6 +17,7 @@ The application tests use a console runner:
 
 ```powershell
 dotnet run --project tests/Keypivo.Tests -c Release --no-build
+dotnet run --project tests/Keypivo.UiTests -c Release --no-build
 ```
 
 Run the Store publishing tests separately:
@@ -25,7 +26,7 @@ Run the Store publishing tests separately:
 ./scripts/test-store-publishing.ps1
 ```
 
-These tests use simulated devices and a fake Store CLI. They do not require a security key, usbipd-win, or Store credentials. See the [verification record](verification.md) for coverage and manual checks.
+These tests use simulated devices and a fake Store CLI. They do not require a security key, usbipd-win, or Store credentials. The native UI checks render the actual WinForms setup pages to `artifacts/ui`; CI uploads them as previews. See the [verification record](verification.md) for coverage and manual checks.
 
 GitHub Actions runs the tests and builds a validated MSIX for PRs to `develop` and `main`. Store submission is configured separately in [Store publishing](store-publishing.md).
 

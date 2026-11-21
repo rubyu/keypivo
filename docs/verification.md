@@ -1,100 +1,45 @@
 # Verification record
 
-Date: 2026-11-16
+Date: 2026-11-21
 
-## Current results
+## Automated checks
 
-| Check | Result |
-| --- | --- |
-| .NET SDK | 10.0.203, Windows x64. |
-| Release build | All three projects compiled with zero warnings and zero errors. |
-| Product naming | User-facing text and assembly product metadata use Keypivo. Previous identifiers remain only for settings compatibility and single-instance coordination. |
-| Binary naming | `keypivo.exe`, `keypivo.dll`, and `keypivo.core.dll` use lowercase filenames. The package is `keypivo-win.zip`. |
-| Text checks | Application text, README, and documentation remain English-only and use Security key for the device. |
-| Automated tests | All 47 application tests passed on GitHub's Windows runner, including 15 switching-verification regressions and two settings-upgrade cases. Local execution remains blocked by Windows application control; the remote run supplies the runtime evidence. |
-| Store publishing guards | Seven fake-CLI tests passed locally: successful submission, missing first publication, pending draft, duplicate version, wrong identity, missing credentials, and query failure. No Store API was called. |
-| MSIX packaging | Self-contained x64 packages passed Windows SDK MakeAppx semantic validation and payload/manifest/logo checks. A version 1.0.0.0 package was also built using the supplied Store identity `24880rubyu.Keypivo` and publisher `CN=4A475315-607B-42C7-B194-4DB633BAC95D`. Store certification is still required. |
-| GitHub CI | [Run 43847629036](https://github.com/rubyu/keypivo/actions/runs/43847629036) passed: 47/47 application tests, 7/7 publishing guard tests, and MSIX build/validation. Store submission was correctly skipped on the PR. Latest checks are on [PR #1](https://github.com/rubyu/keypivo/pull/1). |
-| Native GUI and actual USB switching | Pending verification in an environment that permits the generated assemblies to run. |
-| usbipd CLI | The standard installation was previously confirmed as version 5.3.0, with working state output and supported commands. It is not on PATH. |
+CI builds the solution, runs application and native UI tests, checks Store publishing guards with a fake CLI, and builds and validates the MSIX. Test logs, native form renders, and the package are uploaded as workflow artifacts. No real USB operation or Store submission is involved in PR checks.
 
-No application-control settings, certificate trust settings, or USB connection settings were changed during verification. The supplied listing image documents the menu presentation but does not establish switching behavior. A successful build does not establish runtime correctness.
+Application coverage includes:
 
-## Automated coverage
+- Exact VID/PID matching, first-match selection, settings persistence and migration, parsing errors, and window placement.
+- Manual installation, sharing, and unsharing checks without executing setup commands or automatically attaching afterward.
+- Tracking the original key through enumeration changes; refusing clipboard copying after removal, replacement, a bus change, or an unsuccessful query.
+- Requiring Windows availability before unsharing, including forced-sharing states.
+- Stable attach/detach confirmation through temporary USB disappearance, bounded timeouts, late recovery, cancellation, and concurrent-operation guards.
+- Normal-privilege process arguments, stdout/stderr handling, timeouts, and cancellation.
 
-The original 20 scenarios cover:
+Native UI checks cover setup routing, command visibility, copy guards, incomplete-check feedback, returning to the normal menu, menu actions, and control bounds. Background confirmation leaves instructions visible until the user checks explicitly. There is no separate completion page or switching action on an instruction page.
 
-- USB JSON parsing, malformed schemas, exact IDs, first-match ordering, and disconnected records.
-- Windows availability, persistent sharing, forced sharing, and client attachment.
-- First-time bind followed by attach; idempotent attach and detach; preservation of sharing.
-- Toggle after an external change; detach followed by unbind.
-- Canceled elevation, partial failures, delayed state updates, and false command success.
-- Device removal or replacement during an operation.
-- Missing dependencies, unavailable devices, error recovery, concurrent operations, and cancellation.
-- Command arguments and elevation; stdout/stderr draining; subprocess timeout and cancellation.
+Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos. Publishing guard tests reject invalid submissions without using Store credentials.
 
-Ten additional scenarios cover:
-
-1. Custom VID, optional PID, exact matching, and first-match ordering.
-2. Case normalization, leading zeros, malformed IDs, and invalid display positions.
-3. Defaults, save/restart persistence, and replacement without stale temporary files.
-4. Corrupt settings fallback without overwriting the original file.
-5. Partial settings files with defaults for missing fields.
-6. Rejected saves preserving existing configuration.
-7. Changing filters without mutating USB; the next operation targets the new selection.
-8. Nonmatching PID preventing all USB operations.
-9. Filter changes being rejected during an operation.
-10. Bottom-right and centered placement, negative monitor coordinates, and bounds clamping.
-
-Two settings-upgrade scenarios verify reading an earlier configuration without modifying it, saving to the new location, and giving the new configuration precedence even when it is corrupt.
-
-Fifteen switching-verification regressions cover:
-
-- Temporary missing devices and disconnected persisted entries after detach; no transient status events.
-- An expected state followed by a brief disappearance resetting the stability window.
-- Original-device tracking through bind and attach when enumeration order changes.
-- USB re-enumeration after unbind.
-- A replacement device at the same bus never receiving the original key's unbind command.
-- Late recovery requiring the original instance ID and bus ID, with one completion event.
-- A renewed disappearance restarting late-recovery confirmation.
-- Actual command failures remaining distinct from recoverable verification timeouts.
-- Delayed bind completion neither confirming attachment nor triggering another command.
-- The verification deadline canceling a slow state query and releasing the operation lock.
-- Explicit cancellation remaining cancellation, not a verification timeout.
-- Regular polls, duplicate operations, and filter edits being excluded during verification.
-- Filter changes abandoning an old pending confirmation.
-- A new action superseding an old pending confirmation.
-- State-query failures remaining visible errors.
-
-The regression tests use shortened polling and stability intervals. Production defaults are a 10-second verification deadline, a 500 ms pause between reads, and a one-second stability window. These tests passed remotely; actual hardware switching and the installed Store package still require manual verification.
-
-Run:
+Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
 
 ```powershell
 dotnet build Keypivo.slnx -c Release -m:1
 dotnet run --project tests/Keypivo.Tests -c Release --no-build
+dotnet run --project tests/Keypivo.UiTests -c Release --no-build
+./scripts/test-store-publishing.ps1
 ```
 
-## Native UI acceptance checklist
+## Manual acceptance checklist
 
-Use a Windows environment that permits the app to run, with usbipd-win and WSL2 installed.
+Use the installed package on Windows with a security key and WSL2. Automated tests do not establish actual hardware or Store-package behavior.
 
-1. Start with `--show`. The compact popup contains **Security key**, status, switching, **Refresh status**, **Settings**, and **Exit**. Confirm that Settings is immediately below Refresh status.
-2. Confirm that every app-owned label, notification, dialog, and validation message is English. There is no language picker or old product-specific branding.
-3. Confirm that the initial position is the primary display's bottom-right working area, above the taskbar. Clicking outside or pressing Escape hides the popup without exiting.
-4. Open Settings. Defaults are VID `1050`, empty PID, and **Bottom right**. Save **Center**, reopen the popup and Settings, and restart the app to verify persistence.
-5. Enter a different valid VID and PID. Save and confirm selection updates without changing any USB connection. Empty PID must match every product with the selected VID.
-6. Try invalid VID and PID values. The dialog should stay open, show a concise English validation message, and preserve the previous saved settings. Cancel must discard edits.
-7. With multiple matching connected devices, operate only on the first device in the JSON array. A nonmatching PID must disable switching.
-8. Switch an unshared key to WSL. Cancel UAC once, then retry and approve. Confirm the device with `usbipd list` and Linux `lsusb`.
-9. Switch back to Windows. During USB re-enumeration the popup must stay on **Switching…**, with no **Not connected** or failure notification. After stable Windows availability, one completion notification should appear. The sharing registration should remain. Repeated switching on a shared device should not require UAC.
-10. Use **Stop sharing this key** in Settings. Verify detach and unbind. The link must be disabled for unsaved edits and when no shared key is selected.
-11. Confirm notifications for actual changes, external attach/detach, and unplugging. Unchanged polls should not repeatedly notify.
-12. Confirm errors are concise on the popup and expanded only through **View details**. A failed save must leave the Settings dialog open.
-13. Check 100%, 150%, and 200% display scaling: no clipped title, no empty scrollable areas, and readable buttons. Check keyboard navigation and high-contrast mode.
-14. Exit and confirm the tray icon disappears while the USB connection stays unchanged. A second launch must not create another running instance.
-15. Remove the selected key immediately after a switching command. Verification should end within its 10-second deadline with **Not confirmed**, without repeating the command or operating on another key. Reconnect the original key at the same port in the requested state; after stable regular polling the warning should clear and one completion notification should appear without clicking Refresh status.
-16. Cause a genuine command failure, such as canceling UAC. It should show **Action failed**; later status polls must not silently clear that command error as though it were a confirmation timeout.
-17. Start `keypivo.exe`. Confirm Keypivo in the popup, Settings title, notifications, and file product metadata, with a K-shaped tray icon. With no new settings file, confirm that an earlier configuration is loaded; saving must write to `%LOCALAPPDATA%\Keypivo\settings.json` without changing the earlier file.
+1. Without usbipd-win, choose **Set up…**. Copy and run the installation command outside Keypivo. **Other installation options** opens Microsoft Learn. **Check installation** returns to the menu only after the tool can be queried.
+2. For an unshared key, choose **Set up for WSL…**. Run the displayed bind command in administrator PowerShell. **Check status** returns to the normal menu without attaching the key. An unfinished step keeps the instructions visible with concise feedback.
+3. Open a WSL2 terminal and switch a shared key to WSL, then Windows. During USB re-enumeration, the status stays **Switching…** without a transient failure notification. Verify the actual connection using `usbipd list` and Linux `lsusb`.
+4. In Settings, **Stop sharing this key** is disabled while attached, with **Switch to Windows first.** Return to Windows, open the instructions, run the unbind command manually, and check status. Unsaved settings also disable the link.
+5. Unplug or replace the key while instructions are open. Copy must be disabled until the same key is connected at the same port and a fresh check succeeds. No command may target a replacement key.
+6. Move focus to PowerShell: instructions remain open. Back returns to the menu; Escape hides the popup; reopening it resumes the instructions. Keypivo must never launch an installer, PowerShell, or an administrator consent prompt.
+7. Verify VID/PID filtering, first-device selection, saved display position, state-change notifications, and Exit leaving USB ownership unchanged. A second launch must not create another running instance.
+8. Check keyboard navigation, high-contrast mode, and 100%, 150%, and 200% display scaling for readable, unclipped controls.
+9. Disconnect a key after a switching command. Confirmation must time out without repeating the command or operating on another key. Reconnecting the original key in the expected state should clear the confirmation warning after stable polling. A genuine command failure must remain distinct from a confirmation timeout.
 
-OpenPGP and SSH authentication are separate checks. The app does not generate keys, request PINs, or sign data.
+OpenPGP and SSH authentication are separate checks. Keypivo does not generate keys, request PINs, or sign data. Store certification remains a separate review.

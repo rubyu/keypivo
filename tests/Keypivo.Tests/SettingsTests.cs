@@ -164,7 +164,8 @@ internal static class SettingsTests
 
     private static UsbDevice Device(string vendor, string product, string bus) => new()
     {
-        InstanceId = $@"USB\VID_{vendor}&PID_{product}\{bus}", Description = "Security key", BusId = bus
+        InstanceId = $@"USB\VID_{vendor}&PID_{product}\{bus}", Description = "Security key", BusId = bus,
+        PersistedGuid = Guid.Parse("11111111-1111-1111-1111-111111111111")
     };
 
     private static async Task WithDirectory(Func<SettingsStore, string, Task> action)

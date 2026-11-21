@@ -16,10 +16,10 @@ internal sealed class SettingsForm : Form
     private readonly Func<AppSettings, Task> _apply;
     private bool _saving;
 
-    public SettingsForm(AppSettings settings, bool canUnshare, Func<AppSettings, Task> apply)
+    public SettingsForm(AppSettings settings, bool canUnshare, bool isAttached, Func<AppSettings, Task> apply)
     {
         _original = settings;
-        _canUnshare = canUnshare;
+        _canUnshare = canUnshare && !isAttached;
         _apply = apply;
         Text = "Settings — Keypivo";
         Font = new Font("Segoe UI", 10);
@@ -49,6 +49,8 @@ internal sealed class SettingsForm : Form
         AddField("Product ID (PID)", _pid);
         AddField("Display position", _position);
         _content.Controls.Add(_unshare);
+        if (canUnshare && isAttached)
+            _content.Controls.Add(new Label { Text = "Switch to Windows first.", AutoSize = true, ForeColor = AppTheme.Muted, Margin = new Padding(0, 2, 0, 0) });
         _content.Controls.Add(_error);
         var buttons = new FlowLayoutPanel
         {

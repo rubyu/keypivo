@@ -7,6 +7,7 @@ namespace Keypivo;
 internal sealed class StatusForm : Form
 {
     private readonly FlowLayoutPanel _layout;
+    private readonly SetupPage _setupPage = new() { Visible = false, Location = new Point(1, 1) };
     private readonly PictureBox _logo = new() { Size = new(22, 22), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 8, 0) };
     private readonly Label _status;
     private readonly Button _switch = MenuButton("Switch to WSL", primary: true);
@@ -26,6 +27,10 @@ internal sealed class StatusForm : Form
     public event Action? SettingsRequested;
     public event Action? ExitRequested;
     public event Action? DetailsRequested;
+    public event Action? SetupBackRequested;
+    public event Action? SetupCopyRequested;
+    public event Action? SetupCheckRequested;
+    internal bool IsSetupVisible => _setupPage.Visible;
 
     public StatusForm()
     {
@@ -77,16 +82,21 @@ internal sealed class StatusForm : Form
         };
         state.Controls.Add(_status);
         _details.Visible = false;
+        _switch.Name = "SwitchAction";
+        _details.Name = "StatusDetails";
         _details.ForeColor = AppTheme.Error;
         _layout.Controls.AddRange([header, state, _details, Separator(), _switch, _refresh, _settings, Separator(), _exit]);
-        Controls.Add(_layout);
+        Controls.AddRange([_layout, _setupPage]);
 
         _switch.Click += (_, _) => SwitchRequested?.Invoke();
         _refresh.Click += (_, _) => RefreshRequested?.Invoke();
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
         _exit.Click += (_, _) => ExitRequested?.Invoke();
         _details.Click += (_, _) => DetailsRequested?.Invoke();
-        Deactivate += (_, _) => { if (!KeepOpen) Hide(); };
+        _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
+        _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
+        _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
+        Deactivate += (_, _) => { if (!KeepOpen && !IsSetupVisible) Hide(); };
         SizeChanged += (_, _) => { if (Visible) Place(); };
     }
 
@@ -94,12 +104,14 @@ internal sealed class StatusForm : Form
     {
         SuspendLayout();
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
-        _switch.Text = busy ? "Switching…" : snapshot.Device?.IsAttached == true ? "Switch to Windows" : "Switch to WSL";
-        _switch.Enabled = !busy && !refreshing && snapshot.CanOperate;
+        _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"
+            : snapshot.Device?.IsAttached == true ? "Switch to Windows"
+            : snapshot.Device is { IsShared: false } ? "Set up for WSL…" : "Switch to WSL";
+        _switch.Enabled = !busy && !refreshing && (snapshot.CanOperate || snapshot.State == ConnectionState.ToolMissing);
         _refresh.Enabled = !busy && !refreshing;
         _settings.Enabled = !busy && !refreshing;
         _exit.Enabled = !busy;
-        _details.Visible = !string.IsNullOrEmpty(error ?? snapshot.Error);
+        _details.Visible = snapshot.State != ConnectionState.ToolMissing && !string.IsNullOrEmpty(error ?? snapshot.Error);
         _details.Text = error is null ? "View details" : unconfirmed ? "Not confirmed · View details" : "Action failed · View details";
         _details.ForeColor = unconfirmed ? AppTheme.Muted : AppTheme.Error;
         if (!ReferenceEquals(_lastIcon, icon))
@@ -113,6 +125,34 @@ internal sealed class StatusForm : Form
         if (Visible) Place();
     }
 
+    public void ShowSetup(ManualSetup setup)
+    {
+        SuspendLayout();
+        _setupPage.SetInstructions(setup);
+        _layout.Visible = false;
+        _setupPage.Visible = true;
+        ResumeLayout(true);
+        if (Visible) Place();
+    }
+
+    public void ShowMenu()
+    {
+        SuspendLayout();
+        _setupPage.Visible = false;
+        _layout.Visible = true;
+        ResumeLayout(true);
+        if (Visible) { Place(); _switch.Focus(); }
+    }
+
+    public void RenderSetup(SetupCheckResult result, string? feedback, bool busy, bool checking)
+    {
+        _setupPage.Render(result, feedback, busy, checking);
+        PerformLayout();
+        if (Visible) Place();
+    }
+
+    public void MarkCommandCopied() => _setupPage.MarkCopied();
+
     public void ShowAt(DisplayPosition position)
     {
         _position = position;
@@ -120,7 +160,8 @@ internal sealed class StatusForm : Form
         if (!Visible) Show();
         Place();
         Activate();
-        if (!_switch.Focus()) _refresh.Focus();
+        if (IsSetupVisible) _setupPage.FocusPrimary();
+        else if (!_switch.Focus()) _refresh.Focus();
     }
 
     private void Place()

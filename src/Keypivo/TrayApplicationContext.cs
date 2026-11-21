@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Keypivo.Core;
 
 namespace Keypivo;
@@ -18,6 +19,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private bool _closing;
     private bool _notificationsEnabled;
     private Exception? _lastError;
+    private ManualSetup? _setup;
+    private SetupCheckResult _setupResult = new(false, false, null);
+    private bool _setupChecked;
+    private bool _checkingSetup;
+    private string? _setupMessage;
     private (ConnectionState State, string? InstanceId, string? BusId)? _lastNotification;
 
     public TrayApplicationContext(SwitchController controller, SettingsStore store, SettingsLoadResult loaded, bool showWindow)
@@ -36,6 +42,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _form.SettingsRequested += async () => await ShowSettingsAsync();
         _form.ExitRequested += () => ExitThread();
         _form.DetailsRequested += ShowDetails;
+        _form.SetupBackRequested += () => { CloseSetup(); Render(); ShowStatus(); };
+        _form.SetupCopyRequested += async () => await CheckSetupAsync(copy: true);
+        _form.SetupCheckRequested += async () => await CheckSetupAsync(copy: false);
         _controller.SnapshotChanged += OnSnapshot;
         _controller.VerificationRecovered += OnVerificationRecovered;
         _timer.Tick += async (_, _) => await RefreshAsync();
@@ -66,7 +75,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _refreshing = true;
         if (clearError) _lastError = null;
         Render();
-        try { await _controller.RefreshAsync(_lifetime.Token); }
+        try
+        {
+            if (_setup is { } setup) _setupResult = await _controller.CheckSetupAsync(setup, _lifetime.Token);
+            else await _controller.RefreshAsync(_lifetime.Token);
+        }
         catch (OperationCanceledException) when (_closing) { }
         finally
         {
@@ -83,6 +96,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         Render();
         try { await _controller.ExecuteAsync(action, _lifetime.Token); }
         catch (OperationCanceledException) when (_closing) { }
+        catch (ManualSetupRequiredException exception) { OpenSetup(exception.Setup); }
         catch (Exception exception)
         {
             _lastError = exception;
@@ -102,17 +116,76 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
+    private void OpenSetup(ManualSetup setup)
+    {
+        _lastError = null;
+        _setup = setup;
+        _setupChecked = false;
+        _setupMessage = null;
+        _setupResult = setup.Inspect(_controller.Current);
+        _form.ShowSetup(setup);
+        Render();
+        ShowStatus();
+    }
+
+    private void CloseSetup()
+    {
+        _setup = null;
+        _setupMessage = null;
+        _setupChecked = false;
+        _form.ShowMenu();
+    }
+
+    private async Task CheckSetupAsync(bool copy)
+    {
+        if (_setup is not { } setup || _busy || _refreshing || _editingSettings || _closing) return;
+        _refreshing = true;
+        _checkingSetup = !copy;
+        _setupMessage = null;
+        if (!copy) _setupChecked = true;
+        Render();
+        var completed = false;
+        try
+        {
+            // Never copy a command for a stale bus ID or a replacement device.
+            _setupResult = await _controller.CheckSetupAsync(setup, _lifetime.Token);
+            if (_closing) return;
+            if (copy && _setupResult.CanCopy)
+            {
+                Clipboard.SetText(setup.Command);
+                _form.MarkCommandCopied();
+            }
+            else if (!copy && _setupResult.IsComplete)
+            {
+                CloseSetup();
+                completed = true;
+            }
+        }
+        catch (OperationCanceledException) when (_closing) { }
+        catch (ExternalException) { _setupMessage = "Clipboard is busy. Try copying again."; }
+        catch (Exception) { _setupMessage = "The state could not be checked. Try again."; }
+        finally
+        {
+            _refreshing = _checkingSetup = false;
+            if (!_closing)
+            {
+                Render();
+                if (completed) ShowStatus();
+            }
+        }
+    }
+
     private async Task ShowSettingsAsync()
     {
         if (_busy || _refreshing || _editingSettings || _closing) return;
         _editingSettings = true;
         _form.KeepOpen = true;
         DialogResult result;
+        var device = _controller.Current.Device;
         try
         {
-            var device = _controller.Current.Device;
             using var dialog = new SettingsForm(_settings,
-                device is not null && (device.IsShared || device.IsForced), ApplySettingsAsync) { Icon = _tray.Icon };
+                device is not null && (device.IsShared || device.IsForced), device?.IsAttached == true, ApplySettingsAsync) { Icon = _tray.Icon };
             result = dialog.ShowDialog(_form);
         }
         finally
@@ -123,7 +196,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (_closing) return;
         Render();
         ShowStatus();
-        if (result == DialogResult.Retry) await RunActionAsync(SwitchAction.Unshare);
+        if (result == DialogResult.Retry && device is not null)
+        {
+            OpenSetup(new(SetupKind.Unshare, device));
+            await RefreshAsync();
+        }
     }
 
     private async Task ApplySettingsAsync(AppSettings settings)
@@ -133,6 +210,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _store.Save(settings);
         _settings = settings;
         _lastError = null;
+        CloseSetup();
         var filter = settings.ToFilter();
         if (filter != _controller.Filter) await _controller.UpdateFilterAsync(filter, _lifetime.Token);
         // Selecting a different key is not a USB connection transition.
@@ -187,6 +265,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _tray.Text = $"Keypivo — {(_busy ? "Switching…" : StatePresentation.Title(snapshot.State))}";
         _form.Render(snapshot, _busy, _refreshing, _lastError?.Message, _tray.Icon,
             unconfirmed: _lastError is SwitchVerificationTimeoutException);
+        if (_setup is not null)
+        {
+            var feedback = !_setupResult.CanCopy || (_setupChecked && !_setupResult.IsComplete)
+                ? _setupResult.Message : _setupMessage;
+            _form.RenderSetup(_setupResult, feedback, _busy || _refreshing, _checkingSetup);
+        }
     }
 
     protected override void ExitThreadCore()

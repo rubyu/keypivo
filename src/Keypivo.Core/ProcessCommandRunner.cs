@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Keypivo.Core;
 
-public sealed record CommandRequest(string FileName, IReadOnlyList<string> Arguments, bool Elevated, TimeSpan Timeout);
+public sealed record CommandRequest(string FileName, IReadOnlyList<string> Arguments, TimeSpan Timeout);
 public sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError);
 
 public interface ICommandRunner
@@ -18,31 +18,21 @@ public sealed class ProcessCommandRunner : ICommandRunner
     {
         var startInfo = new ProcessStartInfo(request.FileName)
         {
-            UseShellExecute = request.Elevated,
-            CreateNoWindow = !request.Elevated,
+            UseShellExecute = false,
+            CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
-            RedirectStandardOutput = !request.Elevated,
-            RedirectStandardError = !request.Elevated
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
-        if (request.Elevated) startInfo.Verb = "runas";
-        else
-        {
-            startInfo.StandardOutputEncoding = Encoding.UTF8;
-            startInfo.StandardErrorEncoding = Encoding.UTF8;
-        }
         foreach (var argument in request.Arguments) startInfo.ArgumentList.Add(argument);
 
         using var process = new Process { StartInfo = startInfo };
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // ShellExecute may wait for UAC. Never block the WinForms message loop.
-            if (request.Elevated) await Task.Run(() => process.Start(), cancellationToken);
-            else process.Start();
-        }
-        catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
-        {
-            throw new UsbipdException("The administrator permission request was canceled.", exception);
+            process.Start();
         }
         catch (Win32Exception exception)
         {
@@ -51,8 +41,8 @@ public sealed class ProcessCommandRunner : ICommandRunner
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(request.Timeout);
-        var stdout = request.Elevated ? Task.FromResult("") : process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderr = request.Elevated ? Task.FromResult("") : process.StandardError.ReadToEndAsync(timeout.Token);
+        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
         try
         {
             await process.WaitForExitAsync(timeout.Token);
@@ -66,7 +56,7 @@ public sealed class ProcessCommandRunner : ICommandRunner
             try { await Task.WhenAll(stdout, stderr); }
             catch (OperationCanceledException) { }
             if (cancellationToken.IsCancellationRequested) throw;
-            throw new UsbipdException("usbipd timed out. Refresh the status before trying again. An elevated operation may still be running.");
+            throw new UsbipdException("usbipd timed out. Refresh the status before trying again.");
         }
     }
 }

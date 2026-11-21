@@ -56,46 +56,45 @@ internal static class SwitchVerificationTests
             Equal(true, restored.Elapsed >= options.StabilityPeriod);
             Equal(ConnectionState.WindowsShared, controller.Current.State);
         }),
-        ("Verification: bind and attach follow the original key when enumeration order changes", async () =>
+        ("Verification: attach follows the original key when enumeration order changes", async () =>
         {
-            var fake = new FakeClient(Key(shared: false), Other()) { ApplyChanges = false };
+            var fake = new FakeClient(Key(), Other()) { ApplyChanges = false };
             var observations = 0;
             fake.OnRead = () =>
             {
                 if (fake.Commands.Count == 0) return;
-                fake.Devices = fake.Commands.Count == 1 && ++observations < 3
+                fake.Devices = ++observations < 3
                     ? [Other(), Key() with { BusId = null }]
-                    : [Other(), Key(attached: fake.Commands.Count == 2) with { InstanceId = Key().InstanceId.ToLowerInvariant() }];
+                    : [Other(), Key(attached: true) with { InstanceId = Key().InstanceId.ToLowerInvariant() }];
             };
             var controller = Controller(fake);
             await controller.ExecuteAsync(SwitchAction.Attach);
-            Commands(fake, UsbipdCommand.Bind, UsbipdCommand.Attach);
+            Commands(fake, UsbipdCommand.Attach);
             Equal(true, fake.Commands.All(command => command.BusId == "4-4"));
             Equal(ConnectionState.Attached, controller.Current.State);
             Equal("4-4", controller.Current.Device?.BusId);
         }),
-        ("Verification: unbind also tolerates USB re-enumeration", async () =>
+        ("Verification: detach handles a key whose sharing was removed externally", async () =>
         {
             var fake = new FakeClient(Key(attached: true)) { ApplyChanges = false };
             var observations = 0;
             fake.OnRead = () =>
             {
-                if (fake.Commands.Count == 1) fake.Devices = [Key()];
-                if (fake.Commands.Count == 2)
+                if (fake.Commands.Count > 0)
                     fake.Devices = ++observations < 3 ? [] : [Key(shared: false)];
             };
             var controller = Controller(fake);
-            await controller.ExecuteAsync(SwitchAction.Unshare);
-            Commands(fake, UsbipdCommand.Detach, UsbipdCommand.Unbind);
+            await controller.ExecuteAsync(SwitchAction.Detach);
+            Commands(fake, UsbipdCommand.Detach);
             Equal(ConnectionState.WindowsUnshared, controller.Current.State);
         }),
-        ("Verification: a replacement at the same bus cannot authorize unbind", async () =>
+        ("Verification: a replacement at the same bus cannot confirm detach", async () =>
         {
             var fake = new FakeClient(Key(attached: true)) { ApplyChanges = false };
             fake.OnCommand = (_, _, _) => { fake.Devices = [Other() with { BusId = "4-4" }]; return Task.CompletedTask; };
             var controller = new SwitchController(fake, verification: TimeoutOptions);
-            var timeout = await Throws<SwitchVerificationTimeoutException>(() => controller.ExecuteAsync(SwitchAction.Unshare));
-            Equal(SwitchAction.Unshare, timeout.Action);
+            var timeout = await Throws<SwitchVerificationTimeoutException>(() => controller.ExecuteAsync(SwitchAction.Detach));
+            Equal(SwitchAction.Detach, timeout.Action);
             Equal(ConnectionState.NotConnected, controller.Current.State);
             Commands(fake, UsbipdCommand.Detach);
         }),
@@ -164,9 +163,9 @@ internal static class SwitchVerificationTests
             Equal<SwitchVerificationTimeoutException?>(null, controller.PendingVerification);
             Commands(fake, UsbipdCommand.Detach);
         }),
-        ("Recovery: a delayed bind alone cannot claim attachment or run another command", async () =>
+        ("Recovery: a shared but detached key cannot confirm attachment or trigger another command", async () =>
         {
-            var fake = new FakeClient(Key(shared: false)) { ApplyChanges = false };
+            var fake = new FakeClient(Key()) { ApplyChanges = false };
             fake.OnCommand = (_, _, _) => { fake.Devices = []; return Task.CompletedTask; };
             var controller = new SwitchController(fake, verification: TimeoutOptions);
             var timeout = await Throws<SwitchVerificationTimeoutException>(() => controller.ExecuteAsync(SwitchAction.Attach));
@@ -176,7 +175,7 @@ internal static class SwitchVerificationTests
             await ObserveStableAsync(controller);
             Equal(0, recovered);
             Equal(timeout, controller.PendingVerification);
-            Commands(fake, UsbipdCommand.Bind);
+            Commands(fake, UsbipdCommand.Attach);
         }),
         ("Verification: the deadline cancels a slow state query and releases the lock", async () =>
         {
