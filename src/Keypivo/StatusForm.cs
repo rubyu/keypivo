@@ -16,6 +16,7 @@ internal sealed class StatusForm : Form
     private readonly Button _exit = MenuButton("Exit");
     private readonly Button _details = MenuButton("View details");
     private Icon? _lastIcon;
+    private (DeviceSnapshot Snapshot, bool Busy, bool Refreshing, string? Error, Icon Icon, bool Unconfirmed)? _lastPresentation;
     private DisplayPosition _position;
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -108,6 +109,9 @@ internal sealed class StatusForm : Form
 
     public void Render(DeviceSnapshot snapshot, bool busy, bool refreshing, string? error, Icon icon, bool unconfirmed = false)
     {
+        var presentation = (snapshot, busy, refreshing, error, icon, unconfirmed);
+        if (_lastPresentation == presentation) return;
+        _lastPresentation = presentation;
         SuspendLayout();
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"
@@ -152,7 +156,7 @@ internal sealed class StatusForm : Form
 
     public void RenderSetup(SetupCheckResult result, string? feedback, bool busy, bool checking)
     {
-        _setupPage.Render(result, feedback, busy, checking);
+        if (!_setupPage.Render(result, feedback, busy, checking)) return;
         PerformLayout();
         if (Visible) Place();
     }

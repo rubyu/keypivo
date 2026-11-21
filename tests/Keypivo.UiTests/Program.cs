@@ -14,6 +14,7 @@ internal static class Program
         try
         {
             PopupPresentationTests.Run();
+            PollingPresentationTests.Run();
             using var form = new StatusForm { AllowClose = true };
             var key = new UsbDevice { InstanceId = @"USB\VID_1050&PID_0407\preview", BusId = "4-4" };
             form.Render(new(ConnectionState.ToolMissing, null, 0, "Not installed"), false, false, null, SystemIcons.Application);

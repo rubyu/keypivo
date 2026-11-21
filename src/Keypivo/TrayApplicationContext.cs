@@ -15,6 +15,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly CancellationTokenSource _lifetime = new();
     private bool _busy;
     private bool _refreshing;
+    private TaskCompletionSource? _backgroundRefresh;
     private bool _editingSettings;
     private bool _closing;
     private bool _notificationsEnabled;
@@ -76,24 +77,46 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (!_closing && !_editingSettings) _form.ShowAt(_settings.Position);
     }
 
-    private async Task RefreshAsync(bool clearError = false)
+    internal async Task RefreshAsync(bool clearError = false)
     {
-        if (_busy || _refreshing || _editingSettings || _closing) return;
-        _refreshing = true;
-        if (clearError) _lastError = null;
-        Render();
+        if (_busy || _refreshing || _editingSettings || _closing || (!clearError && _backgroundRefresh is not null)) return;
+        TaskCompletionSource? completion = null;
+        if (clearError)
+        {
+            _refreshing = true;
+            _lastError = null;
+            Render();
+        }
+        else
+        {
+            // Automatic reads are invisible to the UI. Explicit actions wait for
+            // this read instead of being dropped while their buttons look enabled.
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _backgroundRefresh = completion;
+        }
         try
         {
-            if (_setup is { } setup) _setupResult = await _controller.CheckSetupAsync(setup, _lifetime.Token);
+            if (clearError) await WaitForBackgroundRefreshAsync();
+            if (_closing) return;
+            if (_setup is { } setup)
+            {
+                var result = await _controller.CheckSetupAsync(setup, _lifetime.Token);
+                // Back remains usable while a background read is in flight.
+                if (ReferenceEquals(_setup, setup)) _setupResult = result;
+            }
             else await _controller.RefreshAsync(_lifetime.Token);
         }
         catch (OperationCanceledException) when (_closing) { }
         finally
         {
-            _refreshing = false;
+            if (clearError) _refreshing = false;
+            else _backgroundRefresh = null;
+            completion?.TrySetResult();
             if (!_closing) Render();
         }
     }
+
+    private Task WaitForBackgroundRefreshAsync() => _backgroundRefresh?.Task ?? Task.CompletedTask;
 
     private async Task RunActionAsync(SwitchAction action)
     {
@@ -101,7 +124,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _busy = true;
         _lastError = null;
         Render();
-        try { await _controller.ExecuteAsync(action, _lifetime.Token); }
+        try
+        {
+            await WaitForBackgroundRefreshAsync();
+            if (_closing) return;
+            await _controller.ExecuteAsync(action, _lifetime.Token);
+        }
         catch (OperationCanceledException) when (_closing) { }
         catch (ManualSetupRequiredException exception) { OpenSetup(exception.Setup); }
         catch (Exception exception)
@@ -154,6 +182,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var completed = false;
         try
         {
+            await WaitForBackgroundRefreshAsync();
+            if (_closing) return;
             // Never copy a command for a stale bus ID or a replacement device.
             _setupResult = await _controller.CheckSetupAsync(setup, _lifetime.Token);
             if (_closing) return;
@@ -188,9 +218,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _editingSettings = true;
         _form.KeepOpen = true;
         DialogResult result;
-        var device = _controller.Current.Device;
+        UsbDevice? device;
         try
         {
+            await WaitForBackgroundRefreshAsync();
+            if (_closing) return;
+            device = _controller.Current.Device;
             using var dialog = new SettingsForm(_settings,
                 device is not null && (device.IsShared || device.IsForced), device?.IsAttached == true, ApplySettingsAsync) { Icon = _tray.Icon };
             result = dialog.ShowDialog(_form);
@@ -268,8 +301,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void Render()
     {
         var snapshot = _controller.Current;
-        _tray.Icon = _icons.For(_busy ? ConnectionState.Checking : snapshot.State);
-        _tray.Text = $"Keypivo — {(_busy ? "Switching…" : StatePresentation.Title(snapshot.State))}";
+        var icon = _icons.For(_busy ? ConnectionState.Checking : snapshot.State);
+        if (!ReferenceEquals(_tray.Icon, icon)) _tray.Icon = icon;
+        var trayText = $"Keypivo — {(_busy ? "Switching…" : StatePresentation.Title(snapshot.State))}";
+        if (_tray.Text != trayText) _tray.Text = trayText;
         _form.Render(snapshot, _busy, _refreshing, _lastError?.Message, _tray.Icon,
             unconfirmed: _lastError is SwitchVerificationTimeoutException);
         if (_setup is not null)
