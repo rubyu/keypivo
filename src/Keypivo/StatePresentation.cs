@@ -12,7 +12,7 @@ internal static class StatePresentation
         ConnectionState.NotConnected => "Not connected",
         ConnectionState.WindowsUnshared or ConnectionState.WindowsShared => "Available on Windows",
         ConnectionState.ForcedShared => "Shared · Waiting for connection",
-        ConnectionState.Attached => "Connected",
+        ConnectionState.Attached => "Connected to WSL",
         _ => "Unknown"
     };
 

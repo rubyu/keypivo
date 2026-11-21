@@ -13,6 +13,7 @@ internal static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         try
         {
+            PopupPresentationTests.Run();
             using var form = new StatusForm { AllowClose = true };
             var key = new UsbDevice { InstanceId = @"USB\VID_1050&PID_0407\preview", BusId = "4-4" };
             form.Render(new(ConnectionState.ToolMissing, null, 0, "Not installed"), false, false, null, SystemIcons.Application);
@@ -54,11 +55,17 @@ internal static class Program
             Assert(action.Text == "Set up for WSL…", "Unshared menu action");
             form.Render(DeviceSnapshot.FromDevices([key with { PersistedGuid = Guid.NewGuid() }]), false, false, null, SystemIcons.Application);
             Assert(action.Text == "Switch to WSL", "Shared menu action");
+            Assert(Find<Label>(form, "ConnectionStatus").Text == "Available on Windows", "Windows status must identify its destination");
             Application.DoEvents();
             CheckBounds(form);
             Capture(form, "menu");
             form.Render(DeviceSnapshot.FromDevices([key with { PersistedGuid = Guid.NewGuid(), ClientIPAddress = "172.22.0.2" }]), false, false, null, SystemIcons.Application);
             Assert(action.Text == "Switch to Windows", "Attached menu action");
+            Assert(Find<Label>(form, "ConnectionStatus").Text == "Connected to WSL", "Attached status must identify WSL");
+            Assert(StatePresentation.Title(ConnectionState.Attached) == "Connected to WSL", "Notifications and tray tooltip must identify WSL");
+            Application.DoEvents();
+            CheckBounds(form);
+            Capture(form, "menu-wsl");
             using var settings = new SettingsForm(new(), true, true, _ => Task.CompletedTask);
             settings.Show();
             Application.DoEvents();

@@ -34,9 +34,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _tray = new NotifyIcon { Text = "Keypivo", Icon = _icons.For(ConnectionState.Checking), Visible = true };
         _tray.MouseClick += (_, e) =>
         {
-            if (e.Button is MouseButtons.Left or MouseButtons.Right) ShowStatus();
+            if (e.Button is MouseButtons.Left or MouseButtons.Right) ShowStatusFromTray();
         };
-        _tray.BalloonTipClicked += (_, _) => ShowStatus();
+        _tray.BalloonTipClicked += (_, _) => ShowStatusFromTray();
         _form.SwitchRequested += async () => await RunActionAsync(SwitchAction.Toggle);
         _form.RefreshRequested += async () => await RefreshAsync(clearError: true);
         _form.SettingsRequested += async () => await ShowSettingsAsync();
@@ -62,6 +62,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
             if (showWindow) ShowStatus();
             _timer.Start();
         }));
+    }
+
+    private void ShowStatusFromTray()
+    {
+        if (_closing) return;
+        // Let the shell finish its tray-click callback before activating the popup.
+        _form.BeginInvoke((Action)ShowStatus);
     }
 
     private void ShowStatus()
