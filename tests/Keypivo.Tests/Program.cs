@@ -54,13 +54,13 @@ var tests = new (string Name, Func<Task> Run)[]
         Equal(ConnectionState.Attached, DeviceSnapshot.FromDevices([Key(attached: true) with { IsForced = true }]).State);
         return Task.CompletedTask;
     }),
-    ("Attach: initial bind, then attach, verified state", async () =>
+    ("Attach: unshared key requires manual setup without executing a command", async () =>
     {
         var fake = new FakeClient(Key());
         var controller = Controller(fake);
-        await controller.ExecuteAsync(SwitchAction.Attach);
-        Commands(fake, UsbipdCommand.Bind, UsbipdCommand.Attach);
-        Equal(ConnectionState.Attached, controller.Current.State);
+        await Throws<ManualSetupRequiredException>(() => controller.ExecuteAsync(SwitchAction.Attach));
+        Commands(fake);
+        Equal(ConnectionState.WindowsUnshared, controller.Current.State);
     }),
     ("Attach: shared device needs no bind; repeat is idempotent", async () =>
     {
@@ -90,25 +90,27 @@ var tests = new (string Name, Func<Task> Run)[]
         Commands(fake, UsbipdCommand.Detach, UsbipdCommand.Attach);
         Equal(ConnectionState.Attached, controller.Current.State);
     }),
-    ("Unbind: detach first and remove sharing", async () =>
+    ("Forced key: detach then require manual unsharing for Windows access", async () =>
     {
-        var fake = new FakeClient(Key(attached: true));
+        var fake = new FakeClient(Key(attached: true) with { IsForced = true });
         var controller = Controller(fake);
-        await controller.ExecuteAsync(SwitchAction.Unshare);
-        Commands(fake, UsbipdCommand.Detach, UsbipdCommand.Unbind);
-        Equal(ConnectionState.WindowsUnshared, controller.Current.State);
+        await Throws<ManualSetupRequiredException>(() => controller.ExecuteAsync(SwitchAction.Detach));
+        Commands(fake, UsbipdCommand.Detach);
+        Equal(ConnectionState.ForcedShared, controller.Current.State);
     }),
-    ("UAC canceled: no attach and state retained", async () =>
+    ("Sharing removed externally: toggle returns to setup without issuing commands", async () =>
     {
-        var fake = new FakeClient(Key()) { OnCommand = (_, _, _) => throw new UsbipdException("The administrator permission request was canceled.") };
+        var fake = new FakeClient(Key(shared: true));
         var controller = Controller(fake);
-        await Throws<UsbipdException>(() => controller.ExecuteAsync(SwitchAction.Attach));
-        Commands(fake, UsbipdCommand.Bind);
+        await controller.RefreshAsync();
+        fake.Devices = [Key()];
+        await Throws<ManualSetupRequiredException>(() => controller.ExecuteAsync(SwitchAction.Toggle));
+        Commands(fake);
         Equal(ConnectionState.WindowsUnshared, controller.Current.State);
     }),
     ("Failed attach: refresh partial result, never report attachment", async () =>
     {
-        var fake = new FakeClient(Key())
+        var fake = new FakeClient(Key(shared: true))
         {
             OnCommand = (command, _, _) => command == UsbipdCommand.Attach
                 ? throw new UsbipdException("WSL is not running") : Task.CompletedTask
@@ -136,14 +138,14 @@ var tests = new (string Name, Func<Task> Run)[]
         await controller.ExecuteAsync(SwitchAction.Attach);
         Equal(ConnectionState.Attached, controller.Current.State);
     }),
-    ("Unplug during bind: never switch to a second security key", async () =>
+    ("Unplug during attach: never switch to a second security key", async () =>
     {
-        var second = Key() with { InstanceId = @"USB\VID_1050&PID_0407\second", BusId = "6-1" };
-        var fake = new FakeClient(Key(), second) { ApplyChanges = false };
+        var second = Key(shared: true) with { InstanceId = @"USB\VID_1050&PID_0407\second", BusId = "6-1" };
+        var fake = new FakeClient(Key(shared: true), second) { ApplyChanges = false };
         fake.OnCommand = (_, _, _) => { fake.Devices = [second]; return Task.CompletedTask; };
         var controller = Controller(fake);
         await Throws<UsbipdException>(() => controller.ExecuteAsync(SwitchAction.Attach));
-        Commands(fake, UsbipdCommand.Bind);
+        Commands(fake, UsbipdCommand.Attach);
         Equal(ConnectionState.NotConnected, controller.Current.State);
         await controller.RefreshAsync();
         Equal("6-1", controller.Current.Device?.BusId);
@@ -197,16 +199,16 @@ var tests = new (string Name, Func<Task> Run)[]
         await controller.RefreshAsync();
         Equal(ConnectionState.WindowsShared, controller.Current.State);
     }),
-    ("CLI contract: exact arguments and elevation only for bind/unbind", async () =>
+    ("CLI contract: only attach and detach are executable operations", async () =>
     {
         var runner = new FakeRunner();
         var client = new UsbipdClient(runner, () => @"C:\Program Files\usbipd-win\usbipd.exe");
         foreach (var command in Enum.GetValues<UsbipdCommand>()) await client.ExecuteAsync(command, "4-4", default);
-        Equal("bind --busid 4-4|attach --wsl --busid 4-4|detach --busid 4-4|unbind --busid 4-4",
+        Equal("attach --wsl --busid 4-4|detach --busid 4-4",
             string.Join('|', runner.Requests.Select(r => string.Join(' ', r.Arguments))));
-        Equal("True,False,False,True", string.Join(',', runner.Requests.Select(r => r.Elevated)));
-        await Throws<UsbipdException>(() => client.ExecuteAsync(UsbipdCommand.Bind, "4-4 --all", default));
-        Equal(4, runner.Requests.Count);
+        await Throws<UsbipdException>(() => client.ExecuteAsync(UsbipdCommand.Attach, "4-4 --all", default));
+        await Throws<ArgumentOutOfRangeException>(() => client.ExecuteAsync((UsbipdCommand)99, "4-4", default));
+        Equal(2, runner.Requests.Count);
         runner.Result = new(1, "", "service unavailable");
         await Throws<UsbipdException>(() => client.GetDevicesAsync(default));
     }),
@@ -227,7 +229,7 @@ var tests = new (string Name, Func<Task> Run)[]
 };
 
 var failures = 0;
-var allTests = tests.Concat(SettingsTests.All).Concat(SwitchVerificationTests.All).ToArray();
+var allTests = tests.Concat(SettingsTests.All).Concat(SwitchVerificationTests.All).Concat(ManualSetupTests.All).ToArray();
 foreach (var test in allTests)
 {
     try { await test.Run(); Console.WriteLine($"PASS {test.Name}"); }
@@ -260,7 +262,7 @@ static CommandRequest ChildRequest(string argument, TimeSpan timeout)
     var executable = Environment.ProcessPath!;
     string[] arguments = Path.GetFileNameWithoutExtension(executable).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
         ? [Assembly.GetExecutingAssembly().Location, argument] : [argument];
-    return new(executable, arguments, false, timeout);
+    return new(executable, arguments, timeout);
 }
 
 sealed class FakeClient(params UsbDevice[] initial) : IUsbipdClient
@@ -287,10 +289,8 @@ sealed class FakeClient(params UsbDevice[] initial) : IUsbipdClient
         if (!ApplyChanges) return;
         Devices = Devices.Select(d => d.BusId != busId ? d : command switch
         {
-            UsbipdCommand.Bind => d with { PersistedGuid = Guid.Parse("11111111-1111-1111-1111-111111111111") },
             UsbipdCommand.Attach => d with { ClientIPAddress = "172.22.0.2" },
             UsbipdCommand.Detach => d with { ClientIPAddress = null },
-            UsbipdCommand.Unbind => d with { PersistedGuid = null, IsForced = false },
             _ => d
         }).ToArray();
     }

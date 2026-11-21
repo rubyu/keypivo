@@ -27,7 +27,8 @@ try {
     if ($manifest.Package.Applications.Application.Executable -cne 'keypivo.exe') { throw 'Incorrect application entry point.' }
     if ($manifest.Package.Properties.DisplayName -cne 'Keypivo') { throw 'Incorrect product display name.' }
     $capabilities = @($manifest.Package.Capabilities.Capability | ForEach-Object { $_.Name })
-    foreach ($required in @('runFullTrust', 'allowElevation')) {
+    if ('allowElevation' -in $capabilities) { throw 'MSIX must not request allowElevation.' }
+    foreach ($required in @('runFullTrust')) {
         if ($required -notin $capabilities) { throw "Missing desktop capability: $required" }
     }
     Add-Type -AssemblyName System.Drawing

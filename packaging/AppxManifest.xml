@@ -25,7 +25,5 @@
   </Applications>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <!-- bind/unbind launch the separately installed usbipd executable through a user-approved UAC prompt. -->
-    <rescap:Capability Name="allowElevation" />
   </Capabilities>
 </Package>

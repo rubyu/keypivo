@@ -24,11 +24,13 @@ Extract the Keypivo ZIP and run `keypivo.exe`. Portable packages without a bundl
 
 The menu shows the current connection status, and notifications let you know when it changes. Use **Refresh status** to check again.
 
-Click outside the menu or press Escape to dismiss it. **Exit** closes Keypivo and leaves the key's connection unchanged.
+Click outside the menu or press Escape to dismiss it. Setup pages stay open while you work in PowerShell. **Exit** closes Keypivo and leaves the key's connection unchanged.
 
 The key can be used by one operating system at a time. While connected to WSL2, it is unavailable to Windows apps.
 
-The first switch to WSL may request administrator permission to share the device. Returning to Windows keeps it shared for future use. To remove sharing, choose **Stop sharing this key** in Settings.
+For an unshared key, choose **Set up for WSL…**, copy the command, and run it in PowerShell as administrator. Select **Check status** to return to the menu once sharing is enabled. Keypivo then handles everyday switching without administrator prompts.
+
+Returning to Windows keeps the key shared. To remove sharing, first switch to Windows, then choose **Stop sharing this key** in Settings and follow the manual instructions.
 
 ## Settings
 
@@ -42,7 +44,8 @@ If several connected devices match, Keypivo selects the first one. Changing the 
 
 ## Troubleshooting
 
-- **Setup required:** install usbipd-win, then select **Refresh status**.
+- **Setup required:** choose **Set up…**, follow the installation instructions, then select **Check installation**.
+- **Setup cannot be confirmed:** keep the original key connected to the same USB port and check again after running the displayed command.
 - **Not connected:** check the connection and VID/PID settings.
 - **Action failed:** use **View details** to see the error. When switching to WSL, keep a WSL2 terminal open.
 - **Not confirmed:** leave the key connected while Keypivo continues checking. If the message persists, open **View details** before retrying.

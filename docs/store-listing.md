@@ -12,7 +12,7 @@ Switch your security key between Windows and WSL2 from the system tray.
 
 Use your USB security key on Windows or WSL2 with a quick switch from the system tray. See its current connection at a glance and get notified when it changes.
 
-Requires usbipd-win and WSL2 to be installed separately. The key is available to one operating system at a time.
+Requires usbipd-win and WSL2 to be installed separately. Initial sharing setup requires administrator access. The key is available to one operating system at a time.
 
 ## Features
 
@@ -23,12 +23,11 @@ Requires usbipd-win and WSL2 to be installed separately. The key is available to
 
 ## Certification notes
 
-We request the allowElevation capability to support two user-initiated operations that require administrator privileges:
+Keypivo runs as a standard-user desktop application and declares `runFullTrust`. It does not request `allowElevation` or launch elevated processes.
 
-- Enable sharing: When the user selects “Switch to WSL” for a device that is not yet shared, Keypivo runs usbipd bind.
-- Remove sharing: When the user selects “Stop sharing this key” in Settings, Keypivo runs usbipd unbind.
+The app uses the separately installed usbipd-win tool to read device state and run `attach --wsl` and `detach` at normal user privileges. Installation, `bind`, and `unbind` are performed manually by the user outside Keypivo. Setup pages show the required commands and offer clipboard copying and read-only status checks. Keypivo does not execute these setup commands or open an administrator terminal.
 
-For these operations, Keypivo requests elevation for the external usbipd.exe process through the standard Windows UAC mechanism.
+After completing each manual step, select **Check installation** or **Check status**. A confirmed result returns to the normal tray menu. An incomplete step keeps its instructions visible. Normal Windows/WSL switching is available from the menu after the key is shared.
 
 Testing requires Windows, usbipd-win, a running WSL2 distribution, and a USB security key. Default matching uses VID 1050 with no PID restriction; the IDs can be changed in Settings. The device is exclusively available to Windows or to the USB-IP client. The application only manages USB ownership; it does not implement OpenPGP or SSH authentication.
 

@@ -1,6 +1,6 @@
 namespace Keypivo.Core;
 
-public enum SwitchAction { Attach, Detach, Toggle, Unshare }
+public enum SwitchAction { Attach, Detach, Toggle }
 
 public sealed class SwitchController(IUsbipdClient client, DeviceFilter? filter = null, SwitchVerificationOptions? verification = null)
 {
@@ -49,6 +49,8 @@ public sealed class SwitchController(IUsbipdClient client, DeviceFilter? filter 
             _pending = null;
             // The tray can be stale. Always select and decide from a fresh snapshot.
             var initial = await ReadAsync(cancellationToken);
+            if (initial.State == ConnectionState.ToolMissing)
+                throw new ManualSetupRequiredException(new(SetupKind.Install));
             var target = initial.Device ?? throw new UsbipdException(initial.Error ?? "No security key matches the current VID and PID settings.");
             if (action == SwitchAction.Toggle)
                 action = target.IsAttached ? SwitchAction.Detach : SwitchAction.Attach;
@@ -58,37 +60,44 @@ public sealed class SwitchController(IUsbipdClient client, DeviceFilter? filter 
                 case SwitchAction.Attach:
                     if (target.IsAttached) break;
                     if (!target.IsShared)
-                    {
-                        await client.ExecuteAsync(UsbipdCommand.Bind, target.BusId!, cancellationToken);
-                        target = await VerifyAsync(target, d => d.IsShared, action, cancellationToken);
-                    }
+                        throw new ManualSetupRequiredException(new(SetupKind.Share, target));
                     if (!target.IsAttached)
                         await client.ExecuteAsync(UsbipdCommand.Attach, target.BusId!, cancellationToken);
                     await VerifyAsync(target, d => d.IsAttached, action, cancellationToken);
                     break;
                 case SwitchAction.Detach:
-                case SwitchAction.Unshare:
                     if (target.IsAttached)
                     {
                         await client.ExecuteAsync(UsbipdCommand.Detach, target.BusId!, cancellationToken);
-                        target = await VerifyAsync(target,
-                            d => !d.IsAttached && (action == SwitchAction.Unshare || !d.IsForced), action, cancellationToken);
+                        target = await VerifyAsync(target, d => !d.IsAttached, action, cancellationToken);
                     }
-                    if (action == SwitchAction.Unshare && (target.IsShared || target.IsForced))
-                    {
-                        await client.ExecuteAsync(UsbipdCommand.Unbind, target.BusId!, cancellationToken);
-                        await VerifyAsync(target, d => MatchesAction(d, action), action, cancellationToken);
-                    }
+                    if (target.IsForced)
+                        throw new ManualSetupRequiredException(new(SetupKind.Unshare, target));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(action));
             }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException and not SwitchVerificationTimeoutException)
+        catch (Exception exception) when (exception is not OperationCanceledException and not SwitchVerificationTimeoutException and not ManualSetupRequiredException)
         {
             // A failed command can still have changed USB state. Never guess the result.
             if (!cancellationToken.IsCancellationRequested) await ReadAsync(cancellationToken);
             throw;
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<SetupCheckResult> CheckSetupAsync(ManualSetup setup, CancellationToken cancellationToken = default)
+    {
+        if (!await _gate.WaitAsync(0, cancellationToken))
+            throw new UsbipdException("Another operation is in progress. Try again when it finishes.");
+        try
+        {
+            _pending = null;
+            var (devices, targetSnapshot) = await ReadStateAsync(cancellationToken, setup.Target);
+            // Check the original key, but retain first-match selection in the normal menu.
+            Publish(targetSnapshot.Error is null ? DeviceSnapshot.FromDevices(devices, Filter) : targetSnapshot);
+            return setup.Inspect(targetSnapshot);
         }
         finally { _gate.Release(); }
     }
@@ -130,8 +139,7 @@ public sealed class SwitchController(IUsbipdClient client, DeviceFilter? filter 
     private static bool MatchesAction(UsbDevice device, SwitchAction action) => action switch
     {
         SwitchAction.Attach => device.IsAttached,
-        SwitchAction.Detach => !device.IsAttached && !device.IsForced,
-        SwitchAction.Unshare => !device.IsShared && !device.IsAttached && !device.IsForced,
+        SwitchAction.Detach => !device.IsAttached,
         _ => false
     };
 

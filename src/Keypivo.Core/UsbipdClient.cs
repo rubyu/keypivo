@@ -4,7 +4,7 @@ public class UsbipdException(string message, Exception? innerException = null) :
 public sealed class UsbipdNotFoundException() : UsbipdException(
     "usbipd-win was not found. Install it, then refresh the status.\r\n\r\nwinget install --interactive --exact dorssel.usbipd-win");
 
-public enum UsbipdCommand { Bind, Attach, Detach, Unbind }
+public enum UsbipdCommand { Attach, Detach }
 
 public interface IUsbipdClient
 {
@@ -18,7 +18,7 @@ public sealed class UsbipdClient(ICommandRunner runner, Func<string>? locateExec
 
     public async Task<IReadOnlyList<UsbDevice>> GetDevicesAsync(CancellationToken cancellationToken)
     {
-        var result = await runner.RunAsync(new(_locateExecutable(), ["state"], false, TimeSpan.FromSeconds(15)), cancellationToken);
+        var result = await runner.RunAsync(new(_locateExecutable(), ["state"], TimeSpan.FromSeconds(15)), cancellationToken);
         EnsureSuccess(result, "state");
         return UsbipdStateParser.Parse(result.StandardOutput);
     }
@@ -30,14 +30,11 @@ public sealed class UsbipdClient(ICommandRunner runner, Func<string>? locateExec
 
         string[] arguments = command switch
         {
-            UsbipdCommand.Bind => ["bind", "--busid", busId],
             UsbipdCommand.Attach => ["attach", "--wsl", "--busid", busId],
             UsbipdCommand.Detach => ["detach", "--busid", busId],
-            UsbipdCommand.Unbind => ["unbind", "--busid", busId],
             _ => throw new ArgumentOutOfRangeException(nameof(command))
         };
-        var elevated = command is UsbipdCommand.Bind or UsbipdCommand.Unbind;
-        var result = await runner.RunAsync(new(_locateExecutable(), arguments, elevated, TimeSpan.FromSeconds(60)), cancellationToken);
+        var result = await runner.RunAsync(new(_locateExecutable(), arguments, TimeSpan.FromSeconds(60)), cancellationToken);
         EnsureSuccess(result, string.Join(' ', arguments));
     }
 
@@ -68,7 +65,7 @@ public sealed class UsbipdClient(ICommandRunner runner, Func<string>? locateExec
         foreach (var entry in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
         {
             var directory = entry.Trim().Trim('"');
-            // Do not implicitly elevate an executable found in the working directory.
+            // Do not execute an implicitly selected file from the working directory.
             if (!Path.IsPathFullyQualified(directory)) continue;
             var path = Path.Combine(directory, "usbipd.exe");
             if (File.Exists(path)) return Path.GetFullPath(path);
