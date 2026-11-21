@@ -6,6 +6,13 @@ internal static class StartupSettingsTests
 {
     public static void Run()
     {
+        // CI runs unpackaged. Exercise the real identity check without touching
+        // any startup registration, including when a caller requests enabling.
+        var unpackaged = new StartupService();
+        Assert(unpackaged.GetStatusAsync().GetAwaiter().GetResult() == StartupStatus.Unpackaged,
+            "A development executable must be detected as unpackaged");
+        Assert(unpackaged.SetEnabledAsync(true).GetAwaiter().GetResult() == StartupStatus.Unpackaged,
+            "An unpackaged executable must not create a startup registration");
         var startup = new FakeStartupService();
         using (var form = Show(startup))
         {
