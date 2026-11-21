@@ -2,6 +2,8 @@
 
 Switch a USB security key between Windows and WSL2 from your system tray.
 
+Get Keypivo from the [Microsoft Store](https://apps.microsoft.com/detail/9P9S5NCN2DQ4).
+
 ![Keypivo tray menu](docs/images/keypivo.png)
 
 ## Getting started
@@ -14,7 +16,7 @@ Install usbipd-win:
 winget install --interactive --exact dorssel.usbipd-win
 ```
 
-Extract the Keypivo ZIP and run `keypivo.exe`. Portable packages without a bundled runtime also require the .NET 10 Desktop Runtime.
+For portable use, extract the Keypivo ZIP and run `keypivo.exe`. Packages without a bundled runtime also require the .NET 10 Desktop Runtime.
 
 ## Usage
 
