@@ -19,6 +19,7 @@ internal sealed class SetupPage : FlowLayoutPanel
     private readonly Button _check;
     private ManualSetup? _setup;
     private bool _canCopy;
+    private (bool CanCopy, string? Feedback, bool Busy, bool Checking)? _lastPresentation;
 
     public event Action? BackRequested;
     public event Action? CopyRequested;
@@ -104,6 +105,7 @@ internal sealed class SetupPage : FlowLayoutPanel
     public void SetInstructions(ManualSetup setup)
     {
         _setup = setup;
+        _lastPresentation = null;
         SuspendLayout();
         _title.Text = setup.Title;
         _subtitle.Text = setup.Subtitle;
@@ -118,14 +120,18 @@ internal sealed class SetupPage : FlowLayoutPanel
         ResumeLayout(true);
     }
 
-    public void Render(SetupCheckResult result, string? feedback, bool busy, bool checking)
+    public bool Render(SetupCheckResult result, string? feedback, bool busy, bool checking)
     {
+        var presentation = (result.CanCopy, feedback, busy, checking);
+        if (_lastPresentation == presentation) return false;
+        _lastPresentation = presentation;
         _canCopy = result.CanCopy;
         _copy.Enabled = !busy && _canCopy;
         _back.Enabled = _check.Enabled = _help.Enabled = !busy;
         _check.Text = checking ? "Checking…" : _setup?.CheckLabel;
         _feedback.Text = feedback ?? "";
         _feedback.Visible = !string.IsNullOrWhiteSpace(feedback);
+        return true;
     }
 
     public void MarkCopied() => _copy.Text = "Copied";
