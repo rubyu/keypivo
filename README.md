@@ -16,8 +16,6 @@ Install usbipd-win:
 winget install --interactive --exact dorssel.usbipd-win
 ```
 
-For portable use, extract the Keypivo ZIP and run `keypivo.exe`. Packages without a bundled runtime also require the .NET 10 Desktop Runtime.
-
 ## Usage
 
 1. Connect your security key and open a WSL2 terminal.
