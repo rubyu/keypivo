@@ -48,7 +48,7 @@ internal sealed class SettingsForm : Form
         StartPosition = FormStartPosition.Manual;
         BackColor = AppTheme.Surface;
         ForeColor = AppTheme.Text;
-        ClientSize = new Size(620, 570);
+        ClientSize = new Size(620, 520);
 
         _content = new TableLayoutPanel
         {
