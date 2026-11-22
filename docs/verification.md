@@ -19,6 +19,8 @@ Native UI checks cover setup routing, command visibility, copy guards, incomplet
 
 Popup checks exercise native foreground focus and ordering above another topmost window, reopening, dismissal, and releasing topmost status while instructions or Settings stay open. The attached state must read **Connected to WSL** in the menu and the shared text used by notifications and the tray tooltip. These checks use ordinary test windows; the Windows notification-area overflow still requires the manual check below.
 
+Header checks cover equally spaced Refresh, Settings, and Exit icons, their accessible names and tooltips, action routing, busy-state guards, keyboard order, and 100/150/200% body-text layout. Custom icon and primary-button painting must cover stale pixels and preserve partial repaint bounds.
+
 Polling checks exercise the application context with a delayed fake device read. Unchanged automatic reads must leave controls enabled and cause no menu or setup layout events. A user action waits for a pending read and runs once; explicit refresh, setup navigation, changed snapshots, and shutdown remain functional.
 
 Startup UI checks use a simulated Windows startup service: on/off save, cancellation, unchanged settings, user/policy restrictions, read and update failures, and concurrent external changes. They never register a startup task on the test PC. Package checks require exactly one default-enabled `KeypivoStartup` task targeting `keypivo.exe` and reject immediate-install registration.

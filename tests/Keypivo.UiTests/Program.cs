@@ -31,6 +31,7 @@ internal static class Program
         try
         {
             PopupPresentationTests.Run();
+            PopupHeaderTests.Run();
             PollingPresentationTests.Run();
             StartupSettingsTests.Run();
             NotificationSettingsTests.Run();
