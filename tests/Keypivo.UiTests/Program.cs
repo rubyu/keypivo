@@ -11,10 +11,29 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        // Keep the real Windows UI synchronization context installed between
+        // nested DoEvents calls, including across disposable tray contexts.
+        using var dispatcher = new Control();
+        _ = dispatcher.Handle;
+        var result = 1;
+        dispatcher.BeginInvoke((Action)(() =>
+        {
+            result = RunChecks();
+            Application.ExitThread();
+        }));
+        Application.Run();
+        return result;
+    }
+
+    private static int RunChecks()
+    {
         try
         {
             PopupPresentationTests.Run();
             PollingPresentationTests.Run();
+            StartupSettingsTests.Run();
+            NotificationSettingsTests.Run();
+            NotificationDispatchTests.Run();
             using var form = new StatusForm { AllowClose = true };
             var key = new UsbDevice { InstanceId = @"USB\VID_1050&PID_0407\preview", BusId = "4-4" };
             form.Render(new(ConnectionState.ToolMissing, null, 0, "Not installed"), false, false, null, SystemIcons.Application);
@@ -70,7 +89,7 @@ internal static class Program
             using var settings = new SettingsForm(new(), true, true, _ => Task.CompletedTask);
             settings.Show();
             Application.DoEvents();
-            var unshare = settings.Controls.OfType<FlowLayoutPanel>().Single().Controls.OfType<LinkLabel>().Single();
+            var unshare = Find<LinkLabel>(settings, "UnshareKey");
             Assert(!unshare.Enabled, "An attached key must be returned to Windows before manual unsharing");
             settings.Close();
             form.Close();
@@ -88,7 +107,7 @@ internal static class Program
         if (!value) throw new Exception(message);
     }
 
-    private static void CheckBounds(Control parent)
+    internal static void CheckBounds(Control parent)
     {
         foreach (Control child in parent.Controls)
         {
@@ -101,7 +120,7 @@ internal static class Program
         }
     }
 
-    private static void Capture(Form form, string name)
+    internal static void Capture(Form form, string name)
     {
         using var bitmap = new Bitmap(form.Width, form.Height);
         form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));

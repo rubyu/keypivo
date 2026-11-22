@@ -34,12 +34,13 @@ public sealed record AppSettings
     public string VendorId { get; init; } = "1050";
     public string ProductId { get; init; } = "";
     public DisplayPosition Position { get; init; } = DisplayPosition.BottomRight;
+    public NotificationSettings Notifications { get; init; } = new();
 
     public AppSettings Normalize()
     {
         var filter = new DeviceFilter(VendorId, ProductId);
         if (!Enum.IsDefined(Position)) throw new ArgumentException("Invalid display position.", nameof(Position));
-        return this with { VendorId = filter.VendorId, ProductId = filter.ProductId };
+        return this with { VendorId = filter.VendorId, ProductId = filter.ProductId, Notifications = Notifications ?? new() };
     }
 
     public DeviceFilter ToFilter() => new(VendorId, ProductId);
@@ -64,20 +65,31 @@ public sealed class SettingsStore(string filePath, string? legacyFilePath = null
 
     public SettingsLoadResult Load()
     {
+        var notifications = new NotificationSettings();
         try
         {
             // Read earlier releases' settings until the user saves to the new product directory.
             // Never overwrite or delete the previous configuration during an upgrade.
             var readPath = File.Exists(filePath) ? filePath : legacyFilePath;
             if (readPath is null || !File.Exists(readPath)) return new(new(), false);
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(readPath), JsonOptions)
+            var json = File.ReadAllText(readPath);
+            // Preserve readable notification choices even if another setting is invalid.
+            // A wholly unreadable document still falls back to the documented defaults.
+            using (var document = JsonDocument.Parse(json))
+            {
+                if (document.RootElement.ValueKind == JsonValueKind.Object)
+                    foreach (var property in document.RootElement.EnumerateObject())
+                        if (property.Name.Equals(nameof(AppSettings.Notifications), StringComparison.OrdinalIgnoreCase))
+                            notifications = property.Value.Deserialize<NotificationSettings>(JsonOptions) ?? new();
+            }
+            var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
                 ?? throw new JsonException("Empty settings document.");
             return new(settings.Normalize(), false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
         {
             // Leave the original file intact. It is replaced only on an explicit Save.
-            return new(new(), true);
+            return new(new() { Notifications = notifications }, true);
         }
     }
 

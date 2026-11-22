@@ -11,6 +11,10 @@ dotnet run --project src/Keypivo -c Release --no-build -- --show
 
 `--show` opens the tray menu immediately on startup.
 
+Sign-in startup uses the MSIX package's Windows startup task. It is unavailable in unpackaged development runs; native UI tests use a simulated startup service and do not alter the PC's startup settings.
+
+Notification preferences are saved with the other settings. Missing preferences default to on. If the settings document is unreadable, defaults apply; when only another setting is invalid, readable notification preferences are preserved during recovery. The initial status notification uses **Current status at launch**, independently of later connection-change preferences.
+
 ## Tests
 
 The application tests use a console runner:

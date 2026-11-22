@@ -11,6 +11,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly StatusForm _form = new();
     private readonly TrayIcons _icons = new();
     private readonly NotifyIcon _tray;
+    private readonly Action<int, string, ToolTipIcon> _showBalloon;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 2000 };
     private readonly CancellationTokenSource _lifetime = new();
     private bool _busy;
@@ -27,12 +28,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private string? _setupMessage;
     private (ConnectionState State, string? InstanceId, string? BusId)? _lastNotification;
 
-    public TrayApplicationContext(SwitchController controller, SettingsStore store, SettingsLoadResult loaded, bool showWindow)
+    public TrayApplicationContext(SwitchController controller, SettingsStore store, SettingsLoadResult loaded, bool showWindow,
+        Action<int, string, ToolTipIcon>? showBalloon = null)
     {
         _controller = controller;
         _store = store;
         _settings = loaded.Settings;
         _tray = new NotifyIcon { Text = "Keypivo", Icon = _icons.For(ConnectionState.Checking), Visible = true };
+        _showBalloon = showBalloon ?? ((timeout, text, icon) => _tray.ShowBalloonTip(timeout, "Keypivo", text, icon));
         _tray.MouseClick += (_, e) =>
         {
             if (e.Button is MouseButtons.Left or MouseButtons.Right) ShowStatusFromTray();
@@ -57,9 +60,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
             await RefreshAsync();
             if (_closing) return;
             _notificationsEnabled = true;
-            NotifyState(show: !loaded.RecoveredFromError);
+            NotifyState(show: false);
             if (loaded.RecoveredFromError)
-                _tray.ShowBalloonTip(5000, "Keypivo", "Settings could not be loaded. Default settings are in use.", ToolTipIcon.Warning);
+                Notify(NotificationKind.SettingsCouldNotBeLoaded, 5000, "Settings could not be loaded. Default settings are in use.", ToolTipIcon.Warning);
+            else
+                NotifyStateMessage(_controller.Current.State, NotificationKind.CurrentStatusAtLaunch);
             if (showWindow) ShowStatus();
             _timer.Start();
         }));
@@ -140,7 +145,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 var detail = exception is SwitchVerificationTimeoutException
                     ? "Change not confirmed yet. Status checks will continue automatically."
                     : $"The operation could not be completed.\nCurrent state: {StatePresentation.Title(_controller.Current.State)}.";
-                _tray.ShowBalloonTip(6000, "Keypivo", detail, ToolTipIcon.Warning);
+                Notify(exception is SwitchVerificationTimeoutException ? NotificationKind.ChangeNotConfirmed : NotificationKind.ActionFailed,
+                    6000, detail, ToolTipIcon.Warning);
                 ShowStatus();
             }
         }
@@ -243,7 +249,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async Task ApplySettingsAsync(AppSettings settings)
+    internal async Task ApplySettingsAsync(AppSettings settings)
     {
         settings = settings.Normalize();
         // Saving must succeed before the running configuration changes.
@@ -284,7 +290,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         // Report that operation once, then baseline the current selection to avoid a duplicate balloon.
         NotifyState(show: false);
         if (_notificationsEnabled)
-            _tray.ShowBalloonTip(4000, "Keypivo", $"Security key · {StatePresentation.Title(confirmed.State)}", ToolTipIcon.Info);
+            NotifyStateMessage(confirmed.State);
     }
 
     private void NotifyState(bool show)
@@ -294,8 +300,19 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (_lastNotification == identity) return;
         _lastNotification = identity;
         if (!show) return;
-        var icon = snapshot.State is ConnectionState.Error or ConnectionState.ToolMissing ? ToolTipIcon.Warning : ToolTipIcon.Info;
-        _tray.ShowBalloonTip(4000, "Keypivo", $"Security key · {StatePresentation.Title(snapshot.State)}", icon);
+        NotifyStateMessage(snapshot.State);
+    }
+
+    private void NotifyStateMessage(ConnectionState state, NotificationKind? kind = null)
+    {
+        if ((kind ?? NotificationSettings.ForState(state)) is not { } notification) return;
+        var icon = state is ConnectionState.Error or ConnectionState.ToolMissing ? ToolTipIcon.Warning : ToolTipIcon.Info;
+        Notify(notification, 4000, $"Security key · {StatePresentation.Title(state)}", icon);
+    }
+
+    private void Notify(NotificationKind kind, int timeout, string message, ToolTipIcon icon)
+    {
+        if (_settings.Notifications.Allows(kind)) _showBalloon(timeout, message, icon);
     }
 
     private void Render()
