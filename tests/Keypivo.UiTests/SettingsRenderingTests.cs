@@ -29,7 +29,7 @@ internal static class SettingsRenderingTests
                 var rows = page.Controls.Cast<Control>().Where(control => control.Visible).OrderBy(control => control.Top).ToArray();
                 for (var i = 1; i < rows.Length; i++)
                     Assert(rows[i - 1].Bottom <= rows[i].Top,
-                        $"Settings rows overlap at {textScale} in {category}: {rows[i - 1].GetType().Name} '{rows[i - 1].Text}' {rows[i - 1].Bounds}; {rows[i].GetType().Name} '{rows[i].Text}' {rows[i].Bounds}");
+                        $"Settings rows overlap at {textScale} in {category}: {rows[i - 1].GetType().Name} '{rows[i - 1].Text}' {rows[i - 1].Bounds}, min={rows[i - 1].MinimumSize}, preferred={rows[i - 1].PreferredSize}; {rows[i].GetType().Name} '{rows[i].Text}' {rows[i].Bounds}");
                 var navigation = Find<FlowLayoutPanel>(form, "SettingsNavigation");
                 foreach (var button in navigation.Controls.OfType<Button>())
                 {

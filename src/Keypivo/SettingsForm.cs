@@ -133,12 +133,19 @@ internal sealed class SettingsForm : Form
         _vid.TextChanged += (_, _) => UpdateUnshare();
         _pid.TextChanged += (_, _) => UpdateUnshare();
         _position.SelectedIndexChanged += (_, _) => UpdateUnshare();
+        _position.FontChanged += (_, _) =>
+        {
+            // ComboBox updates its native height/cache after FontChanged is
+            // raised. Relayout after that update, not from inside the event.
+            if (IsHandleCreated) BeginInvoke((Action)RefreshGeneralLayout);
+        };
         _startup.CheckedChanged += (_, _) => UpdateUnshare();
         _startupSettings.LinkClicked += (_, _) => OpenStartupSettings();
         _save.Click += async (_, _) => await SaveAsync();
         _unshare.LinkClicked += (_, _) => { DialogResult = DialogResult.Retry; Close(); };
         Shown += (_, _) => Place(settings.Position);
         Shown += async (_, _) => await LoadStartupAsync();
+        Shown += (_, _) => RefreshGeneralLayout();
         Activated += async (_, _) =>
         {
             if (!_reloadStartupOnActivate || _saving) return;
@@ -204,6 +211,14 @@ internal sealed class SettingsForm : Form
             }
         }
         finally { _layingOutPages = false; }
+    }
+
+    private void RefreshGeneralLayout()
+    {
+        if (IsDisposed || Disposing) return;
+        _position.MinimumSize = Size.Empty;
+        _position.MinimumSize = new Size(0, _position.PreferredHeight);
+        _general.PerformLayout();
     }
 
     private void SelectCategory(string id)
