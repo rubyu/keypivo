@@ -4,7 +4,7 @@ Date: 2026-11-22
 
 ## Automated checks
 
-CI builds the solution, runs application and native UI tests, checks Store publishing guards with a fake CLI, and builds and validates the MSIX. Test logs, native form renders, and the package are uploaded as workflow artifacts. No real USB operation or Store submission is involved in PR checks.
+CI builds the solution, runs application and native UI tests, and builds and validates the MSIX. Test logs, native form renders, and the package are uploaded as workflow artifacts. No real USB operation or Store submission is involved in any CI run.
 
 Application coverage includes:
 
@@ -25,7 +25,7 @@ Startup UI checks use a simulated Windows startup service: on/off save, cancella
 
 Notification checks cover defaults and older settings, individual preferences, the master switch retaining choices, persistence, recovery, and state mapping. Native checks exercise category navigation, control bounds, Save/Cancel, validation from another page, and accessible switch actions. Delivery checks capture notification requests instead of showing Windows balloons and exercise startup, every connection state, operation failures, confirmation timeouts, late recovery, live preference changes, and duplicate suppression.
 
-Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos. Publishing guard tests reject invalid submissions without using Store credentials.
+Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
 
@@ -33,7 +33,6 @@ Local Release compilation is supported. Runtime execution on the development PC 
 dotnet build Keypivo.slnx -c Release -m:1
 dotnet run --project tests/Keypivo.Tests -c Release --no-build
 dotnet run --project tests/Keypivo.UiTests -c Release --no-build
-./scripts/test-store-publishing.ps1
 ```
 
 ## Manual acceptance checklist
