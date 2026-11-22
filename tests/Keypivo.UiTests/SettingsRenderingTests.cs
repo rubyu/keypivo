@@ -23,11 +23,13 @@ internal static class SettingsRenderingTests
                 Application.DoEvents();
                 Assert(form.Size == initialSize, "Switching categories must not resize the dialog");
                 var page = Find<FlowLayoutPanel>(form, category + "Page");
+                Program.Capture(form, $"settings-text-{textScale * 100:0}-{category.ToLowerInvariant()}");
                 Assert(!page.HorizontalScroll.Visible, "Settings pages must not scroll horizontally");
                 Program.CheckBounds(form);
                 var rows = page.Controls.Cast<Control>().Where(control => control.Visible).OrderBy(control => control.Top).ToArray();
                 for (var i = 1; i < rows.Length; i++)
-                    Assert(rows[i - 1].Bottom <= rows[i].Top, "Settings rows must not overlap");
+                    Assert(rows[i - 1].Bottom <= rows[i].Top,
+                        $"Settings rows overlap at {textScale} in {category}: {rows[i - 1].GetType().Name} '{rows[i - 1].Text}' {rows[i - 1].Bounds}; {rows[i].GetType().Name} '{rows[i].Text}' {rows[i].Bounds}");
                 var navigation = Find<FlowLayoutPanel>(form, "SettingsNavigation");
                 foreach (var button in navigation.Controls.OfType<Button>())
                 {
