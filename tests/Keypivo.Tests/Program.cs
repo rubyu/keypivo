@@ -229,7 +229,7 @@ var tests = new (string Name, Func<Task> Run)[]
 };
 
 var failures = 0;
-var allTests = tests.Concat(SettingsTests.All).Concat(SwitchVerificationTests.All).Concat(ManualSetupTests.All).ToArray();
+var allTests = tests.Concat(SettingsTests.All).Concat(NotificationSettingsTests.All).Concat(SwitchVerificationTests.All).Concat(ManualSetupTests.All).ToArray();
 foreach (var test in allTests)
 {
     try { await test.Run(); Console.WriteLine($"PASS {test.Name}"); }
