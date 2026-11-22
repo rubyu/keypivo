@@ -24,15 +24,9 @@ dotnet run --project tests/Keypivo.Tests -c Release --no-build
 dotnet run --project tests/Keypivo.UiTests -c Release --no-build
 ```
 
-Run the Store publishing tests separately:
+These tests use simulated devices. They do not require a security key, usbipd-win, or Store credentials. The native UI checks render the actual WinForms setup pages to `artifacts/ui`; CI uploads them as previews. See the [verification record](verification.md) for coverage and manual checks.
 
-```powershell
-./scripts/test-store-publishing.ps1
-```
-
-These tests use simulated devices and a fake Store CLI. They do not require a security key, usbipd-win, or Store credentials. The native UI checks render the actual WinForms setup pages to `artifacts/ui`; CI uploads them as previews. See the [verification record](verification.md) for coverage and manual checks.
-
-GitHub Actions runs the tests and builds a validated MSIX for PRs to `develop` and `main`. Store submission is configured separately in [Store publishing](store-publishing.md).
+GitHub Actions runs the tests and builds a validated MSIX for PRs to `develop` and `main`, pushes to those branches, and manual runs. Store updates are submitted manually in Partner Center; see [Store publishing](store-publishing.md).
 
 ## Portable packages
 
@@ -54,4 +48,4 @@ Portable binaries are unsigned. Deployment to a PC with application-control poli
 
 ## Store packages
 
-The MSIX manifest and Store identity are in `packaging`. Follow [Store publishing](store-publishing.md) to build a package, complete the first submission, and enable subsequent updates from CI.
+The MSIX manifest and Store identity are in `packaging`. Follow [Store publishing](store-publishing.md) to download a CI package or build one locally, then submit an update in Partner Center.
