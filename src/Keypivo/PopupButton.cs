@@ -1,8 +1,9 @@
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
 namespace Keypivo;
 
-internal enum PopupGlyph { Refresh, Settings, Power }
+internal enum PopupGlyph { Refresh, Settings, Power, Info }
 
 // Native Button behavior (keyboard, accessibility, disabled actions) with
 // DPI-independent artwork that does not depend on an installed icon font.
@@ -11,6 +12,13 @@ internal sealed class PopupButton : Button
     private readonly PopupGlyph? _glyph;
     private bool _hovered;
     private bool _pressed;
+    private bool _selected;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal bool Selected
+    {
+        get => _selected;
+        set { if (_selected == value) return; _selected = value; Invalidate(); }
+    }
 
     public PopupButton(PopupGlyph? glyph = null)
     {
@@ -53,6 +61,11 @@ internal sealed class PopupButton : Button
         {
             fill = active ? AppTheme.Hover : BackColor;
             if (active) foreground = AppTheme.Text;
+            if (Selected)
+            {
+                foreground = AppTheme.Accent;
+                fill = AppTheme.AccentSurface;
+            }
             if (active && _glyph == PopupGlyph.Power)
             {
                 foreground = AppTheme.Error;
@@ -112,6 +125,11 @@ internal sealed class PopupButton : Button
             case PopupGlyph.Power:
                 graphics.DrawArc(pen, 4.5f, 4.5f, 15, 15, -50, 280);
                 graphics.DrawLine(pen, 12, 2.5f, 12, 11);
+                break;
+            case PopupGlyph.Info:
+                graphics.DrawEllipse(pen, 3, 3, 18, 18);
+                graphics.DrawLine(pen, 12, 11, 12, 17);
+                graphics.DrawLine(pen, 12, 7, 12, 7.1f);
                 break;
         }
     }

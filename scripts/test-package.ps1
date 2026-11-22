@@ -13,7 +13,7 @@ $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Packag
 try {
     $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     foreach ($required in @('keypivo.exe', 'keypivo.dll', 'keypivo.core.dll', 'keypivo.runtimeconfig.json',
-        'coreclr.dll', 'System.Private.CoreLib.dll', 'LICENSE', 'AppxManifest.xml', 'AppxBlockMap.xml',
+        'coreclr.dll', 'System.Private.CoreLib.dll', 'LICENSE', 'THIRD-PARTY-NOTICES.txt', 'AppxManifest.xml', 'AppxBlockMap.xml',
         'Assets/StoreLogo.png', 'Assets/Square44x44Logo.png', 'Assets/Square150x150Logo.png')) {
         if ($required -cnotin $names) { throw "Package is missing: $required" }
     }

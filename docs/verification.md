@@ -29,7 +29,9 @@ Notification checks cover defaults and older settings, individual preferences, t
 
 Rendering checks verify that switches repaint their full background, erase old labels, and respect a partial paint clip. Settings navigation and scrolling are exercised with body text at 100%, 150%, and 200% of its default size. CI also captures the visible menu and Settings window directly from the Windows desktop, alongside the control-rendered previews. Physical monitor DPI changes remain part of manual acceptance.
 
-Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos.
+Device-detail checks cover offline USB ID lookups, vendor/product scoping, malformed IDs, class/interface sections, and unknown-name fallbacks. Native checks cover compact/full toggling, aligned value columns, the divider after Vendor, live connection and sharing states, clearing removed devices, unchanged polling, 100/150/200% body text, and scrolling long descriptions within the working area.
+
+Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, third-party notices, and logos.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
 

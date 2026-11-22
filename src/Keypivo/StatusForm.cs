@@ -15,6 +15,9 @@ internal sealed class StatusForm : Form
     private readonly Button _settings = new PopupButton(PopupGlyph.Settings) { Name = "OpenSettings", AccessibleName = "Settings", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _exit = new PopupButton(PopupGlyph.Power) { Name = "ExitApplication", AccessibleName = "Exit Keypivo" };
     private readonly ToolTip _toolTip = new();
+    private readonly PopupButton _info = new(PopupGlyph.Info) { Name = "ToggleDeviceDetails", AccessibleName = "Show all device details", BackColor = AppTheme.Surface };
+    private readonly DeviceDetailsPanel _deviceDetails = new();
+    private bool _sizingDetails;
     private readonly Button _details = MenuButton("View details");
     private Icon? _lastIcon;
     private (DeviceSnapshot Snapshot, bool Busy, bool Refreshing, string? Error, Icon Icon, bool Unconfirmed)? _lastPresentation;
@@ -54,7 +57,7 @@ internal sealed class StatusForm : Form
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Name = "MenuLayout", Location = new Point(1, 1), Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 24)
+            Name = "MenuLayout", Location = new Point(1, 1), Margin = Padding.Empty
         };
         var header = new TableLayoutPanel
         {
@@ -91,10 +94,21 @@ internal sealed class StatusForm : Form
             MinimumSize = new Size(438, 0), FlowDirection = FlowDirection.TopDown,
             WrapContents = false, Margin = Padding.Empty, Padding = new Padding(24, 32, 24, 32)
         };
-        state.Controls.Add(new Label
+        var title = new TableLayoutPanel
         {
-            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 16, FontStyle.Bold), Margin = Padding.Empty
-        });
+            Name = "DeviceTitle", Width = 390, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(390, 0), ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
+        };
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        title.Controls.Add(new Label
+        {
+            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
+            Margin = Padding.Empty, Anchor = AnchorStyles.Left
+        }, 0, 0);
+        title.Controls.Add(_info, 1, 0);
+        state.Controls.Add(title);
+        _toolTip.SetToolTip(_info, _info.AccessibleName);
         _status = new Label
         {
             Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(390, 0),
@@ -105,7 +119,7 @@ internal sealed class StatusForm : Form
         _switch.Name = "SwitchAction";
         _details.Name = "StatusDetails";
         _details.ForeColor = AppTheme.Error;
-        _layout.Controls.AddRange([header, Separator(), state, _details, _switch]);
+        _layout.Controls.AddRange([header, Separator(), state, _details, _switch, _deviceDetails]);
         Controls.AddRange([_layout, _setupPage]);
 
         _switch.Click += (_, _) => SwitchRequested?.Invoke();
@@ -113,6 +127,13 @@ internal sealed class StatusForm : Form
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
         _exit.Click += (_, _) => ExitRequested?.Invoke();
         _details.Click += (_, _) => DetailsRequested?.Invoke();
+        _info.Click += (_, _) =>
+        {
+            _deviceDetails.Toggle();
+            _info.Selected = _deviceDetails.Expanded;
+            _info.AccessibleName = _deviceDetails.Expanded ? "Show compact device details" : "Show all device details";
+            _toolTip.SetToolTip(_info, _info.AccessibleName);
+        };
         _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
         _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
         _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
@@ -143,6 +164,7 @@ internal sealed class StatusForm : Form
         _details.Visible = snapshot.State != ConnectionState.ToolMissing && !string.IsNullOrEmpty(error ?? snapshot.Error);
         _details.Text = error is null ? "View details" : unconfirmed ? "Not confirmed · View details" : "Action failed · View details";
         _details.ForeColor = unconfirmed ? AppTheme.Muted : AppTheme.Error;
+        _deviceDetails.Render(snapshot.Device);
         if (!ReferenceEquals(_lastIcon, icon))
         {
             _logo.Image?.Dispose();
@@ -201,6 +223,20 @@ internal sealed class StatusForm : Form
     {
         var area = (Screen.PrimaryScreen ?? Screen.FromControl(this)).WorkingArea;
         Location = WindowPlacement.Calculate(area, Size, _position, (int)Math.Round(16 * DeviceDpi / 96d));
+    }
+
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        if (_layout is null || _sizingDetails) return;
+        _sizingDetails = true;
+        try
+        {
+            var area = (Screen.PrimaryScreen ?? Screen.FromControl(this)).WorkingArea;
+            var available = area.Height - (int)Math.Round(32 * DeviceDpi / 96d) - (_layout.Height - _deviceDetails.Height) - 2;
+            _deviceDetails.LimitHeight(Math.Max(80, available));
+        }
+        finally { _sizingDetails = false; }
     }
 
     protected override void OnPaint(PaintEventArgs e)

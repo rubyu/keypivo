@@ -24,6 +24,8 @@ winget install --interactive --exact dorssel.usbipd-win
 
 The menu shows the current connection status, and notifications let you know when it changes. Use **Refresh status** to check again.
 
+Below the switch button, you can see the key's product and persisted GUID. Use the information icon beside **Security key** to show its vendor, description, connection, sharing status, and bus ID.
+
 Click outside the menu or press Escape to dismiss it. Setup pages stay open while you work in PowerShell. **Exit** closes Keypivo and leaves the key's connection unchanged.
 
 The key can be used by one operating system at a time. While connected to WSL2, it is unavailable to Windows apps.

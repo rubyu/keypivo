@@ -42,7 +42,9 @@ internal static class PopupHeaderTests
         refresh.Focus();
         Assert(popup.SelectNextControl(refresh, true, true, true, true) && settings.Focused, "Keyboard navigation must reach Settings after Refresh");
         Assert(popup.SelectNextControl(settings, true, true, true, true) && exit.Focused, "Keyboard navigation must reach Exit after Settings");
-        Assert(popup.SelectNextControl(exit, true, true, true, true) && action.Focused, "Keyboard navigation must reach the primary action after the header");
+        var info = Find<Button>(popup, "ToggleDeviceDetails");
+        Assert(popup.SelectNextControl(exit, true, true, true, true) && info.Focused, "Keyboard navigation must reach device information after the header");
+        Assert(popup.SelectNextControl(info, true, true, true, true) && action.Focused, "Keyboard navigation must reach the primary action after device information");
 
         var defaultFont = popup.Font;
         foreach (var textScale in new[] { 1f, 1.5f, 2f })
@@ -71,7 +73,7 @@ internal static class PopupHeaderTests
     private static void CheckPaintCoverage()
     {
         var paint = typeof(PopupButton).GetMethod("OnPaint", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        foreach (var glyph in new PopupGlyph?[] { PopupGlyph.Refresh, PopupGlyph.Settings, PopupGlyph.Power, null })
+        foreach (var glyph in new PopupGlyph?[] { PopupGlyph.Refresh, PopupGlyph.Settings, PopupGlyph.Power, PopupGlyph.Info, null })
         {
             using var button = new PopupButton(glyph) { Text = glyph.HasValue ? "" : "Switch to Windows" };
             using var bitmap = new Bitmap(button.Width, button.Height);
