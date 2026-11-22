@@ -8,7 +8,7 @@ internal sealed class SettingsForm : Form
 {
     private readonly TextBox _vid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, AccessibleName = "Vendor ID (VID)" };
     private readonly TextBox _pid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, PlaceholderText = "Any product", AccessibleName = "Product ID (PID)" };
-    private readonly ComboBox _position = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Display position" };
+    private readonly ComboBox _position = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true, AccessibleName = "Display position" };
     private readonly CheckBox _startup = new() { Name = "StartAtSignIn", Text = "Start at sign-in", AutoSize = true, Enabled = false, Margin = new Padding(0, 0, 0, 8) };
     private readonly Label _startupHint = new() { Name = "StartupHint", Text = "Checking startup setting…", AutoSize = true, MaximumSize = new Size(360, 0), ForeColor = AppTheme.Muted, Margin = new Padding(0, 0, 0, 8) };
     private readonly LinkLabel _startupSettings = new() { Name = "WindowsStartupSettings", Text = "Open Windows startup settings", AutoSize = true, Visible = false, Margin = new Padding(0, 0, 0, 12) };
@@ -192,6 +192,13 @@ internal sealed class SettingsForm : Form
                     control.MaximumSize = new Size(available, 0);
                 else if (control is NotificationToggle toggle)
                     toggle.Size = toggle.GetPreferredSize(new Size(available, 0));
+                else if (control is ComboBox combo)
+                {
+                    // Native combo height follows its font. Flow layout must
+                    // reserve that height, not its original specified bounds.
+                    combo.MinimumSize = new Size(0, combo.PreferredHeight);
+                    combo.Width = available;
+                }
                 else
                     control.Width = available;
             }
