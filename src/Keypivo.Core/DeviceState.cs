@@ -22,7 +22,7 @@ public sealed partial record UsbDevice
     [JsonRequired] public string? BusId { get; init; }
     [JsonRequired] public Guid? PersistedGuid { get; init; }
     [JsonRequired] public string? ClientIPAddress { get; init; }
-    public string Description { get; init; } = "USB device";
+    public string Description { get; init; } = "";
     public bool IsForced { get; init; }
 
     [JsonIgnore] public bool IsConnected => BusId is not null && BusIdPattern().IsMatch(BusId);
