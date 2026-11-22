@@ -8,7 +8,9 @@ internal sealed class SettingsForm : Form
 {
     private readonly TextBox _vid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, AccessibleName = "Vendor ID (VID)" };
     private readonly TextBox _pid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, PlaceholderText = "Any product", AccessibleName = "Product ID (PID)" };
-    private readonly ComboBox _position = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true, AccessibleName = "Display position" };
+    // Let flow layout measure the native height after font/DPI changes instead
+    // of reusing the original fixed height (ComboBox ignores minimum height).
+    private readonly ComboBox _position = new() { Name = "DisplayPosition", Width = 360, AutoSize = true, DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true, AccessibleName = "Display position" };
     private readonly CheckBox _startup = new() { Name = "StartAtSignIn", Text = "Start at sign-in", AutoSize = true, Enabled = false, Margin = new Padding(0, 0, 0, 8) };
     private readonly Label _startupHint = new() { Name = "StartupHint", Text = "Checking startup setting…", AutoSize = true, MaximumSize = new Size(360, 0), ForeColor = AppTheme.Muted, Margin = new Padding(0, 0, 0, 8) };
     private readonly LinkLabel _startupSettings = new() { Name = "WindowsStartupSettings", Text = "Open Windows startup settings", AutoSize = true, Visible = false, Margin = new Padding(0, 0, 0, 12) };
@@ -133,19 +135,12 @@ internal sealed class SettingsForm : Form
         _vid.TextChanged += (_, _) => UpdateUnshare();
         _pid.TextChanged += (_, _) => UpdateUnshare();
         _position.SelectedIndexChanged += (_, _) => UpdateUnshare();
-        _position.FontChanged += (_, _) =>
-        {
-            // ComboBox updates its native height/cache after FontChanged is
-            // raised. Relayout after that update, not from inside the event.
-            if (IsHandleCreated) BeginInvoke((Action)RefreshGeneralLayout);
-        };
         _startup.CheckedChanged += (_, _) => UpdateUnshare();
         _startupSettings.LinkClicked += (_, _) => OpenStartupSettings();
         _save.Click += async (_, _) => await SaveAsync();
         _unshare.LinkClicked += (_, _) => { DialogResult = DialogResult.Retry; Close(); };
         Shown += (_, _) => Place(settings.Position);
         Shown += async (_, _) => await LoadStartupAsync();
-        Shown += (_, _) => RefreshGeneralLayout();
         Activated += async (_, _) =>
         {
             if (!_reloadStartupOnActivate || _saving) return;
@@ -199,26 +194,11 @@ internal sealed class SettingsForm : Form
                     control.MaximumSize = new Size(available, 0);
                 else if (control is NotificationToggle toggle)
                     toggle.Size = toggle.GetPreferredSize(new Size(available, 0));
-                else if (control is ComboBox combo)
-                {
-                    // Native combo height follows its font. Flow layout must
-                    // reserve that height, not its original specified bounds.
-                    combo.MinimumSize = new Size(0, combo.PreferredHeight);
-                    combo.Width = available;
-                }
                 else
                     control.Width = available;
             }
         }
         finally { _layingOutPages = false; }
-    }
-
-    private void RefreshGeneralLayout()
-    {
-        if (IsDisposed || Disposing) return;
-        _position.MinimumSize = Size.Empty;
-        _position.MinimumSize = new Size(0, _position.PreferredHeight);
-        _general.PerformLayout();
     }
 
     private void SelectCategory(string id)
