@@ -27,6 +27,8 @@ jobs:
     name: Windows build and tests
     runs-on: windows-latest
     timeout-minutes: 20
+    outputs:
+      package-version: ${{ steps.package.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,6 +45,8 @@ jobs:
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           dotnet run --project tests/Keypivo.Tests -c Release --no-build | Tee-Object -FilePath artifacts/tests.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check release publishing
+        run: ./scripts/test-release.ps1
       - name: Check native setup screens
         run: dotnet run --project tests/Keypivo.UiTests -c Release --no-build
       - name: Upload native UI previews
@@ -54,6 +58,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Build and validate MSIX
+        id: package
         run: |
           $config = Get-Content -LiteralPath packaging/store.json -Raw | ConvertFrom-Json
           foreach ($value in @($config.appId, $config.identityName, $config.publisher, $config.publisherDisplayName)) {
@@ -64,6 +69,7 @@ jobs:
           $build = $run % 65536
           $version = "1.$minor.$build.0"
           ./scripts/package-store.ps1 -IdentityName $config.identityName -Publisher $config.publisher -PublisherDisplayName $config.publisherDisplayName -Version $version
+          "version=$version" >> $env:GITHUB_OUTPUT
           "Package version: $version (x64)" >> $env:GITHUB_STEP_SUMMARY
       - name: Upload MSIX
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -80,3 +86,28 @@ jobs:
           path: artifacts/tests.log
           if-no-files-found: warn
           retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: keypivo-msix-${{ github.sha }}
+          path: artifacts/release
+      - name: Publish validated package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ needs.build.outputs.package-version }}
+        run: |
+          ./scripts/publish-release.ps1 -Repository $env:GITHUB_REPOSITORY -Version $env:PACKAGE_VERSION `
+            -Commit $env:GITHUB_SHA -PackagePath "artifacts/release/keypivo-$env:PACKAGE_VERSION-x64.msix" `
+            -RunUrl "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"

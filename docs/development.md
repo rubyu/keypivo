@@ -26,7 +26,7 @@ dotnet run --project tests/Keypivo.UiTests -c Release --no-build
 
 These tests use simulated devices. They do not require a security key, usbipd-win, or Store credentials. The native UI checks render the actual WinForms setup pages to `artifacts/ui`; CI uploads them as previews. See the [verification record](verification.md) for coverage and manual checks.
 
-GitHub Actions runs the tests and builds a validated MSIX for PRs to `develop` and `main`, pushes to those branches, and manual runs. Store updates are submitted manually in Partner Center; see [Store publishing](store-publishing.md).
+GitHub Actions runs the tests and builds a validated MSIX for PRs to `develop` and `main`, pushes to those branches, and manual runs. Successful pushes and manual runs on `main` publish that package and its checksum to GitHub Releases. Store updates are submitted manually in Partner Center; see [Store publishing](store-publishing.md).
 
 ## Portable packages
 
