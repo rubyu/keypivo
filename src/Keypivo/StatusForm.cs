@@ -8,7 +8,7 @@ internal sealed class StatusForm : Form
 {
     private readonly FlowLayoutPanel _layout;
     private readonly SetupPage _setupPage = new() { Visible = false, Location = new Point(1, 1) };
-    private readonly PictureBox _logo = new() { Size = new(22, 22), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 8, 0) };
+    private readonly PictureBox _logo = new() { Size = new(26, 26), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 12, 0) };
     private readonly Label _status;
     private readonly Button _switch = MenuButton("Switch to WSL", primary: true);
     private readonly Button _refresh = MenuButton("Refresh status");
@@ -36,7 +36,7 @@ internal sealed class StatusForm : Form
     public StatusForm()
     {
         Text = "Keypivo";
-        Font = new Font("Segoe UI", 10);
+        Font = new Font("Segoe UI", 11);
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.None;
@@ -52,34 +52,34 @@ internal sealed class StatusForm : Form
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Location = new Point(1, 1), Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 5)
+            Location = new Point(1, 1), Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 8)
         };
         var header = new FlowLayoutPanel
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Width = 318, MinimumSize = new Size(318, 0), Margin = Padding.Empty,
-            Padding = new Padding(16, 15, 16, 10), WrapContents = false
+            Width = 438, MinimumSize = new Size(438, 0), Margin = Padding.Empty,
+            Padding = new Padding(24, 24, 24, 18), WrapContents = false
         };
         header.Controls.Add(_logo);
         header.Controls.Add(new Label
         {
-            Text = "Keypivo", AutoSize = true, Font = new Font(Font, FontStyle.Bold),
+            Text = "Keypivo", AutoSize = true, Font = new Font(Font.FontFamily, 13, FontStyle.Bold),
             Margin = new Padding(0, 1, 0, 0)
         });
         var state = new FlowLayoutPanel
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(318, 0), FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Margin = Padding.Empty, Padding = new Padding(18, 8, 18, 15)
+            MinimumSize = new Size(438, 0), FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Margin = Padding.Empty, Padding = new Padding(24, 12, 24, 24)
         };
         state.Controls.Add(new Label
         {
-            Text = "Security key", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = Padding.Empty
+            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 14, FontStyle.Bold), Margin = Padding.Empty
         });
         _status = new Label
         {
-            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(282, 0),
-            ForeColor = AppTheme.Muted, Margin = new Padding(0, 3, 0, 0)
+            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(390, 0),
+            ForeColor = AppTheme.Muted, Margin = new Padding(0, 6, 0, 0)
         };
         state.Controls.Add(_status);
         _details.Visible = false;
@@ -233,9 +233,9 @@ internal sealed class StatusForm : Form
     {
         var button = new Button
         {
-            Text = text, Width = 308, Height = 42, Margin = new Padding(5, 0, 5, 0),
+            Text = text, Width = 422, Height = 56, Margin = new Padding(8, 0, 8, 0),
             FlatStyle = FlatStyle.Flat, TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(12, 0, 12, 0), TabStop = true,
+            Padding = new Padding(16, 0, 16, 0), TabStop = true,
             BackColor = primary ? AppTheme.AccentSurface : AppTheme.Surface,
             ForeColor = AppTheme.Text, UseVisualStyleBackColor = false
         };
@@ -247,6 +247,6 @@ internal sealed class StatusForm : Form
 
     private static Panel Separator() => new()
     {
-        BackColor = AppTheme.Border, Height = 1, Width = 318, Margin = new Padding(0, 5, 0, 5)
+        BackColor = AppTheme.Border, Height = 1, Width = 438, Margin = new Padding(0, 8, 0, 8)
     };
 }

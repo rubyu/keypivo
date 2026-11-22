@@ -25,6 +25,8 @@ Startup UI checks use a simulated Windows startup service: on/off save, cancella
 
 Notification checks cover defaults and older settings, individual preferences, the master switch retaining choices, persistence, recovery, and state mapping. Native checks exercise category navigation, control bounds, Save/Cancel, validation from another page, and accessible switch actions. Delivery checks capture notification requests instead of showing Windows balloons and exercise startup, every connection state, operation failures, confirmation timeouts, late recovery, live preference changes, and duplicate suppression.
 
+Rendering checks verify that switches repaint their full background, erase old labels, and respect a partial paint clip. Settings navigation and scrolling are exercised with body text at 100%, 150%, and 200% of its default size. CI also captures the visible menu and Settings window directly from the Windows desktop, alongside the control-rendered previews. Physical monitor DPI changes remain part of manual acceptance.
+
 Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.

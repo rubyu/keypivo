@@ -1,4 +1,5 @@
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Keypivo.Core;
 
 namespace Keypivo.UiTests;
@@ -33,6 +34,7 @@ internal static class Program
             PollingPresentationTests.Run();
             StartupSettingsTests.Run();
             NotificationSettingsTests.Run();
+            SettingsRenderingTests.Run();
             NotificationDispatchTests.Run();
             using var form = new StatusForm { AllowClose = true };
             var key = new UsbDevice { InstanceId = @"USB\VID_1050&PID_0407\preview", BusId = "4-4" };
@@ -79,6 +81,7 @@ internal static class Program
             Application.DoEvents();
             CheckBounds(form);
             Capture(form, "menu");
+            CaptureScreen(form, "menu-screen");
             form.Render(DeviceSnapshot.FromDevices([key with { PersistedGuid = Guid.NewGuid(), ClientIPAddress = "172.22.0.2" }]), false, false, null, SystemIcons.Application);
             Assert(action.Text == "Switch to Windows", "Attached menu action");
             Assert(Find<Label>(form, "ConnectionStatus").Text == "Connected to WSL", "Attached status must identify WSL");
@@ -109,16 +112,38 @@ internal static class Program
 
     internal static void CheckBounds(Control parent)
     {
+        var bounds = parent is ScrollableControl { AutoScroll: true, VerticalScroll: { Visible: true } } scroll
+            ? new Rectangle(0, scroll.DisplayRectangle.Top, parent.ClientSize.Width, scroll.DisplayRectangle.Height)
+            : new Rectangle(Point.Empty, parent.ClientSize);
         foreach (Control child in parent.Controls)
         {
             if (!child.Visible) continue;
-            Assert(child.Left >= 0 && child.Top >= 0 && child.Right <= parent.ClientSize.Width + 1 && child.Bottom <= parent.ClientSize.Height + 1,
+            Assert(child.Left >= bounds.Left && child.Top >= bounds.Top && child.Right <= bounds.Right + 1 && child.Bottom <= bounds.Bottom + 1,
                 $"Control clipped: {child.Name} {child.Bounds} in {parent.Name} {parent.ClientSize}");
             if (child is Label label && label.AutoSize)
                 Assert(label.Height >= label.GetPreferredSize(new Size(label.Width, 0)).Height, $"Label clipped: {label.Name}");
             CheckBounds(child);
         }
     }
+
+    internal static void CaptureScreen(Form form, string name)
+    {
+        form.BringToFront();
+        form.Activate();
+        form.Refresh();
+        Application.DoEvents();
+        _ = DwmFlush();
+        using var bitmap = new Bitmap(form.Width, form.Height);
+        using (var graphics = Graphics.FromImage(bitmap))
+            graphics.CopyFromScreen(form.Location, Point.Empty, form.Size);
+        var path = Path.GetFullPath(Path.Combine("artifacts", "ui", name + ".png"));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        bitmap.Save(path, ImageFormat.Png);
+        Console.WriteLine($"UI_IMAGE {name} {Convert.ToBase64String(File.ReadAllBytes(path))}");
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
 
     internal static void Capture(Form form, string name)
     {
