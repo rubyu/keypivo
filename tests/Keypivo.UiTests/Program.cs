@@ -11,6 +11,22 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        // Keep the real Windows UI synchronization context installed between
+        // nested DoEvents calls, including across disposable tray contexts.
+        using var dispatcher = new Control();
+        _ = dispatcher.Handle;
+        var result = 1;
+        dispatcher.BeginInvoke((Action)(() =>
+        {
+            result = RunChecks();
+            Application.ExitThread();
+        }));
+        Application.Run();
+        return result;
+    }
+
+    private static int RunChecks()
+    {
         try
         {
             PopupPresentationTests.Run();
