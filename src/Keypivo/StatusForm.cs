@@ -104,7 +104,7 @@ internal sealed class StatusForm : Form
         title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _deviceHeading = new Label
         {
-            Name = "DeviceHeading", Text = "Security key", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
+            Name = "DeviceHeading", Text = "-", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
             Width = 342, Height = 40, AutoEllipsis = true, UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
             Anchor = AnchorStyles.Top | AnchorStyles.Left
@@ -162,7 +162,7 @@ internal sealed class StatusForm : Form
         _lastPresentation = presentation;
         SuspendLayout();
         var description = snapshot.Device?.Description;
-        _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "Security key" : description;
+        _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "-" : description;
         _toolTip.SetToolTip(_deviceHeading, _deviceHeading.Text);
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"

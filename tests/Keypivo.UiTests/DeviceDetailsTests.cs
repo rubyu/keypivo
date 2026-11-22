@@ -65,15 +65,17 @@ internal static class DeviceDetailsTests
         Assert(Find<Label>(popup, "ConnectionValue").Text == "WSL" && panel.Expanded, "State changes must update details without collapsing them");
         Program.Capture(popup, "details-wsl");
         popup.Render(DeviceSnapshot.FromDevices([]), false, false, null, icons.For(ConnectionState.NotConnected));
-        Assert(heading.Text == "Security key", "Removing a device must clear the previous heading");
-        Assert(panel.Controls.OfType<Label>().Where(label => label.Name.EndsWith("Value", StringComparison.Ordinal)).All(label => label.Text == "—"),
+        Assert(heading.Text == "-", "Removing a device must replace the previous heading with a hyphen");
+        Assert(panel.Controls.OfType<Label>().Where(label => label.Name.EndsWith("Value", StringComparison.Ordinal)).All(label => label.Text == "-"),
             "Removing a device must clear every previous value");
+        Application.DoEvents();
+        Program.CaptureScreen(popup, "details-disconnected");
         info.PerformClick();
         Assert(!panel.Expanded && info.AccessibleName == "Show all device details", "Info must return to compact mode");
         foreach (var description in new[] { "", "  ", "Reader & authentication device" })
         {
             popup.Render(DeviceSnapshot.FromDevices([device with { Description = description }]), false, false, null, icon);
-            Assert(heading.Text == (string.IsNullOrWhiteSpace(description) ? "Security key" : description),
+            Assert(heading.Text == (string.IsNullOrWhiteSpace(description) ? "-" : description),
                 "Replacement and empty descriptions must update the heading");
         }
 

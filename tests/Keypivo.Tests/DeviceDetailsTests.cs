@@ -49,7 +49,7 @@ internal static class DeviceDetailsTests
             Equal("Windows", windows.Connection);
             Equal("Not shared", windows.Sharing);
             Equal("4-4", windows.BusId);
-            Equal("—", windows.PersistedGuid);
+            Equal("-", windows.PersistedGuid);
             var id = Guid.Parse("6f9619ff-8b86-4b80-b42d-00c04fc964ff");
             var shared = device with { PersistedGuid = id };
             Equal("Shared", DeviceDetails.From(shared).Sharing);
@@ -65,11 +65,12 @@ internal static class DeviceDetailsTests
             var knownVendor = DeviceDetails.From(new() { InstanceId = @"USB\VID_1050&PID_FFEE\test", BusId = "1-2", Description = "" }, database);
             Equal("Unknown product (FFEE)", knownVendor.Product);
             Equal("Known vendor (1050)", knownVendor.Vendor);
-            Equal("—", knownVendor.Description);
+            Equal("-", knownVendor.Description);
             var unknown = DeviceDetails.From(new() { InstanceId = @"USB\VID_FFFF&PID_0001\test", BusId = "1-2" }, database);
             Equal("Unknown vendor (FFFF)", unknown.Vendor);
             Equal("Unknown product (0001)", unknown.Product);
-            Equal(new DeviceDetails("—", "—", "—", "—", "—", "—", "—"), DeviceDetails.From(null));
+            Equal("-", unknown.Description);
+            Equal(new DeviceDetails("-", "-", "-", "-", "-", "-", "-"), DeviceDetails.From(null));
             return Task.CompletedTask;
         })
     ];
