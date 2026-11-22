@@ -10,6 +10,9 @@ internal sealed class DeviceDetailsPanel : Panel
     private bool _expanded;
     private bool _arranging;
     private int _maximumHeight = int.MaxValue;
+    private Font? _captionFont;
+    private Font? _valueFont;
+    private Font? _monoFont;
 
     internal bool Expanded => _expanded;
 
@@ -28,6 +31,7 @@ internal sealed class DeviceDetailsPanel : Panel
             .ToArray();
         foreach (var row in _rows) Controls.AddRange([row.Caption, row.Value]);
         Controls.Add(_separator);
+        UpdateDetailFonts();
         ArrangeRows();
     }
 
@@ -66,7 +70,38 @@ internal sealed class DeviceDetailsPanel : Panel
     protected override void OnFontChanged(EventArgs e)
     {
         base.OnFontChanged(e);
+        UpdateDetailFonts();
         ArrangeRows();
+    }
+
+    private void UpdateDetailFonts()
+    {
+        if (_rows is null) return;
+        var oldCaption = _captionFont;
+        var oldValue = _valueFont;
+        var oldMono = _monoFont;
+        _captionFont = new Font(Font.FontFamily, Font.SizeInPoints * 13 / 16);
+        _valueFont = new Font(Font.FontFamily, Font.SizeInPoints * 15 / 16);
+        _monoFont = new Font("Consolas", Font.SizeInPoints * 13 / 16);
+        SuspendLayout();
+        for (var i = 0; i < _rows.Length; i++)
+        {
+            _rows[i].Caption.Font = _captionFont;
+            _rows[i].Value.Font = i == 6 ? _monoFont : _valueFont;
+        }
+        ResumeLayout(true);
+        oldCaption?.Dispose();
+        oldValue?.Dispose();
+        oldMono?.Dispose();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (!disposing) return;
+        _captionFont?.Dispose();
+        _valueFont?.Dispose();
+        _monoFont?.Dispose();
     }
 
     private void ArrangeRows()
@@ -77,7 +112,9 @@ internal sealed class DeviceDetailsPanel : Panel
         {
             int Scale(int value) => (int)Math.Round(value * DeviceDpi / 96d);
             var left = Scale(24);
-            var labelWidth = Scale(112);
+            // Measure every caption, including hidden rows, to keep the same
+            // columns in both modes while accommodating enlarged body text.
+            var labelWidth = Math.Clamp(_rows.Max(row => TextRenderer.MeasureText(row.Caption.Text, row.Caption.Font).Width), Scale(105), Scale(160));
             var valueLeft = left + labelWidth + Scale(12);
             // Reserve the scrollbar width in both modes so values never move
             // horizontally when the expanded list needs to scroll.

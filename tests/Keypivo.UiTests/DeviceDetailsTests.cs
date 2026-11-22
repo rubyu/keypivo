@@ -27,6 +27,9 @@ internal static class DeviceDetailsTests
         Assert(VisibleValues(panel).SequenceEqual(new[] { "ProductValue", "PersistedGUIDValue" }), "Compact mode must show only Product and Persisted GUID");
         CheckRows(panel);
         Assert(product.Left == guid.Left && product.Width == guid.Width, "Product and GUID must share a value column");
+        var guidCaption = Find<Label>(popup, "PersistedGUIDCaption");
+        Assert(TextRenderer.MeasureText(guidCaption.Text, guidCaption.Font).Width <= guidCaption.Width,
+            "The Persisted GUID caption must fit on one line at the default text size");
         var valueLeft = product.Left;
         Program.CaptureScreen(popup, "details-compact");
 
