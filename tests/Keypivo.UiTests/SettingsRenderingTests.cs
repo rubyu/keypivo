@@ -74,7 +74,7 @@ internal static class SettingsRenderingTests
             for (var y = 0; y < toggle.Height; y++)
             for (var x = 0; x < textWidth; x++)
                 Assert(bitmap.GetPixel(x, y).ToArgb() == toggle.BackColor.ToArgb(),
-                    "Repainting must erase the previous label instead of leaving a text ghost");
+                    $"Repainting must erase the previous label: pixel ({x}, {y}) is {bitmap.GetPixel(x, y)}");
             toggle.Text = "Settings could not be loaded";
         }
         graphics.Clear(Color.Magenta);

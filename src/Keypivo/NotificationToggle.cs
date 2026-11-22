@@ -29,6 +29,7 @@ internal sealed class NotificationToggle : CheckBox
     {
         // ButtonBase is opaque: owner painting must cover the entire buffer on
         // every repaint, otherwise old text and uninitialized pixels remain.
+        e.Graphics.SmoothingMode = SmoothingMode.None;
         using var background = new SolidBrush(BackColor);
         e.Graphics.FillRectangle(background, ClientRectangle);
         var scale = DeviceDpi / 96f;
