@@ -10,6 +10,7 @@ internal sealed class StatusForm : Form
     private readonly SetupPage _setupPage = new() { Visible = false, Location = new Point(1, 1) };
     private readonly PictureBox _logo = new() { Size = new(23, 23), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 10, 0), TabStop = false };
     private readonly Label _status;
+    private readonly Label _deviceHeading;
     private readonly Button _switch = new PopupButton { Text = "Switch to WSL", Margin = new Padding(24, 0, 24, 0) };
     private readonly Button _refresh = new PopupButton(PopupGlyph.Refresh) { Name = "RefreshStatus", AccessibleName = "Refresh status", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _settings = new PopupButton(PopupGlyph.Settings) { Name = "OpenSettings", AccessibleName = "Settings", Margin = new Padding(0, 0, 4, 0) };
@@ -101,11 +102,18 @@ internal sealed class StatusForm : Form
         };
         title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        title.Controls.Add(new Label
+        _deviceHeading = new Label
         {
-            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
-            Margin = Padding.Empty, Anchor = AnchorStyles.Left
-        }, 0, 0);
+            Name = "DeviceHeading", Text = "Security key", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
+            Width = 342, Height = 40, AutoEllipsis = true, UseMnemonic = false,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        _deviceHeading.TextChanged += (_, _) => SizeDeviceHeading();
+        _deviceHeading.FontChanged += (_, _) => SizeDeviceHeading();
+        _deviceHeading.SizeChanged += (_, _) => SizeDeviceHeading();
+        _info.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        title.Controls.Add(_deviceHeading, 0, 0);
         title.Controls.Add(_info, 1, 0);
         state.Controls.Add(title);
         _toolTip.SetToolTip(_info, _info.AccessibleName);
@@ -153,6 +161,9 @@ internal sealed class StatusForm : Form
         if (_lastPresentation == presentation) return;
         _lastPresentation = presentation;
         SuspendLayout();
+        var description = snapshot.Device?.Description;
+        _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "Security key" : description;
+        _toolTip.SetToolTip(_deviceHeading, _deviceHeading.Text);
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"
             : snapshot.Device?.IsAttached == true ? "Switch to Windows"
@@ -223,6 +234,14 @@ internal sealed class StatusForm : Form
     {
         var area = (Screen.PrimaryScreen ?? Screen.FromControl(this)).WorkingArea;
         Location = WindowPlacement.Calculate(area, Size, _position, (int)Math.Round(16 * DeviceDpi / 96d));
+    }
+
+    private void SizeDeviceHeading()
+    {
+        // Keep the action visible even for unusually long Windows descriptions.
+        // The full description remains available in the tooltip and details.
+        var preferred = _deviceHeading.GetPreferredSize(new Size(_deviceHeading.Width, 0)).Height;
+        _deviceHeading.Height = Math.Max(_info.Height, Math.Min(preferred, _deviceHeading.Font.Height * 3));
     }
 
     protected override void OnLayout(LayoutEventArgs levent)

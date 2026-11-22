@@ -20,6 +20,10 @@ internal static class DeviceDetailsTests
         popup.ShowAt(DisplayPosition.Center);
         Application.DoEvents();
         var info = Find<PopupButton>(popup, "ToggleDeviceDetails");
+        var heading = Find<Label>(popup, "DeviceHeading");
+        Assert(heading.Text == device.Description && !heading.UseMnemonic, "The heading must display the selected device description literally");
+        Assert(heading.Right < info.Left && heading.Height >= heading.GetPreferredSize(new Size(heading.Width, 0)).Height,
+            "A normal description must wrap without overlapping the information icon");
         var panel = Find<DeviceDetailsPanel>(popup, "DeviceDetails");
         var product = Find<Label>(popup, "ProductValue");
         var guid = Find<Label>(popup, "PersistedGUIDValue");
@@ -61,10 +65,17 @@ internal static class DeviceDetailsTests
         Assert(Find<Label>(popup, "ConnectionValue").Text == "WSL" && panel.Expanded, "State changes must update details without collapsing them");
         Program.Capture(popup, "details-wsl");
         popup.Render(DeviceSnapshot.FromDevices([]), false, false, null, icons.For(ConnectionState.NotConnected));
+        Assert(heading.Text == "Security key", "Removing a device must clear the previous heading");
         Assert(panel.Controls.OfType<Label>().Where(label => label.Name.EndsWith("Value", StringComparison.Ordinal)).All(label => label.Text == "—"),
             "Removing a device must clear every previous value");
         info.PerformClick();
         Assert(!panel.Expanded && info.AccessibleName == "Show all device details", "Info must return to compact mode");
+        foreach (var description in new[] { "", "  ", "Reader & authentication device" })
+        {
+            popup.Render(DeviceSnapshot.FromDevices([device with { Description = description }]), false, false, null, icon);
+            Assert(heading.Text == (string.IsNullOrWhiteSpace(description) ? "Security key" : description),
+                "Replacement and empty descriptions must update the heading");
+        }
 
         var defaultFont = popup.Font;
         foreach (var scale in new[] { 1f, 1.5f, 2f })
@@ -91,6 +102,9 @@ internal static class DeviceDetailsTests
         info.PerformClick();
         Application.DoEvents();
         Assert(panel.VerticalScroll.Visible && !panel.HorizontalScroll.Visible, "Long descriptions must scroll within the detail area");
+        Assert(heading.Text == longDescription && heading.AutoEllipsis && heading.Height <= heading.Font.Height * 3,
+            "An unusually long heading must be bounded while retaining its full accessible text");
+        Assert(heading.Right < info.Left, "A long heading must leave the information icon accessible");
         CheckRows(panel);
         panel.ScrollControlIntoView(guid);
         Application.DoEvents();
