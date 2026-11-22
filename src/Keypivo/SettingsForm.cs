@@ -8,7 +8,9 @@ internal sealed class SettingsForm : Form
 {
     private readonly TextBox _vid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, AccessibleName = "Vendor ID (VID)" };
     private readonly TextBox _pid = new() { Width = 360, MaxLength = 4, CharacterCasing = CharacterCasing.Upper, PlaceholderText = "Any product", AccessibleName = "Product ID (PID)" };
-    private readonly ComboBox _position = new() { Width = 360, DropDownStyle = ComboBoxStyle.DropDownList, AccessibleName = "Display position" };
+    // Let flow layout measure the native height after font/DPI changes instead
+    // of reusing the original fixed height (ComboBox ignores minimum height).
+    private readonly ComboBox _position = new() { Name = "DisplayPosition", Width = 360, AutoSize = true, DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true, AccessibleName = "Display position" };
     private readonly CheckBox _startup = new() { Name = "StartAtSignIn", Text = "Start at sign-in", AutoSize = true, Enabled = false, Margin = new Padding(0, 0, 0, 8) };
     private readonly Label _startupHint = new() { Name = "StartupHint", Text = "Checking startup setting…", AutoSize = true, MaximumSize = new Size(360, 0), ForeColor = AppTheme.Muted, Margin = new Padding(0, 0, 0, 8) };
     private readonly LinkLabel _startupSettings = new() { Name = "WindowsStartupSettings", Text = "Open Windows startup settings", AutoSize = true, Visible = false, Margin = new Padding(0, 0, 0, 12) };
@@ -22,6 +24,7 @@ internal sealed class SettingsForm : Form
     private readonly Dictionary<NotificationKind, NotificationToggle> _notificationChecks = new();
     private readonly List<NotificationToggle> _notificationMasters = new();
     private bool _syncingNotifications;
+    private bool _layingOutPages;
     private readonly AppSettings _original;
     private readonly bool _canUnshare;
     private readonly Func<AppSettings, Task> _apply;
@@ -38,7 +41,7 @@ internal sealed class SettingsForm : Form
         _apply = apply;
         _startupService = startupService ?? new StartupService();
         Text = "Settings — Keypivo";
-        Font = new Font("Segoe UI", 10);
+        Font = new Font("Segoe UI", 11);
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -48,20 +51,22 @@ internal sealed class SettingsForm : Form
         StartPosition = FormStartPosition.Manual;
         BackColor = AppTheme.Surface;
         ForeColor = AppTheme.Text;
-        ClientSize = new Size(620, 520);
+        ClientSize = new Size(800, 640);
+        DoubleBuffered = true;
 
         _content = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty
         };
-        _content.ColumnStyles.Add(new(SizeType.Absolute, 148));
+        _content.ColumnStyles.Add(new(SizeType.Absolute, 220));
         _content.ColumnStyles.Add(new(SizeType.Percent, 100));
         _content.RowStyles.Add(new(SizeType.Percent, 100));
         _content.RowStyles.Add(new(SizeType.AutoSize));
         var navigation = new FlowLayoutPanel
         {
             Name = "SettingsNavigation", Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, BackColor = AppTheme.Hover, Padding = new Padding(12, 20, 12, 12), Margin = Padding.Empty
+            WrapContents = false, AutoScroll = true, BackColor = AppTheme.Hover,
+            Padding = new Padding(12, 24, 12, 12), Margin = Padding.Empty
         };
         _content.Controls.Add(navigation, 0, 0);
         _content.Controls.Add(_pages, 1, 0);
@@ -79,7 +84,7 @@ internal sealed class SettingsForm : Form
             _general.Controls.Add(new Label { Text = "Switch to Windows first.", AutoSize = true, ForeColor = AppTheme.Muted, Margin = new Padding(0, 2, 0, 0) });
         navigation.Controls.Add(new Label
         {
-            Text = "Notifications", AutoSize = true, ForeColor = AppTheme.Muted,
+            Name = "NotificationsHeading", Text = "Notifications", AutoSize = true, ForeColor = AppTheme.Muted,
             Margin = new Padding(10, 24, 0, 10)
         });
         AddNotifications(navigation, "Launch", "At launch", settings.Notifications,
@@ -95,20 +100,32 @@ internal sealed class SettingsForm : Form
             (NotificationKind.ActionFailed, "Action failed"),
             (NotificationKind.ChangeNotConfirmed, "Change not confirmed"),
             (NotificationKind.SettingsCouldNotBeLoaded, "Settings could not be loaded"));
-        var footer = new FlowLayoutPanel
+        navigation.Layout += (_, _) =>
+        {
+            foreach (var button in navigation.Controls.OfType<Button>())
+                button.Size = new Size(navigation.ClientSize.Width - navigation.Padding.Horizontal,
+                    Math.Max(LogicalToDeviceUnits(48), button.Font.Height + LogicalToDeviceUnits(20)));
+        };
+        var footer = new TableLayoutPanel
         {
             Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(24, 16, 24, 20), Margin = Padding.Empty
+            ColumnCount = 1, RowCount = 2, Padding = new Padding(28, 16, 28, 24), Margin = Padding.Empty
         };
-        footer.Controls.Add(_error);
+        footer.ColumnStyles.Add(new(SizeType.Percent, 100));
+        footer.RowStyles.Add(new(SizeType.AutoSize));
+        footer.RowStyles.Add(new(SizeType.AutoSize));
+        _error.Dock = DockStyle.Fill;
+        _error.MaximumSize = Size.Empty;
+        footer.Controls.Add(_error, 0, 0);
         var buttons = new FlowLayoutPanel
         {
-            Width = 572, MinimumSize = new Size(572, 0), AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.RightToLeft, WrapContents = false, Margin = Padding.Empty
         };
-        var cancel = new Button { Name = "CancelSettings", Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(90, 36) };
+        _save.MinimumSize = new Size(104, 44);
+        var cancel = new Button { Name = "CancelSettings", Text = "Cancel", DialogResult = DialogResult.Cancel, AutoSize = true, MinimumSize = new Size(104, 44) };
         buttons.Controls.AddRange([_save, cancel]);
-        footer.Controls.Add(buttons);
+        footer.Controls.Add(buttons, 0, 1);
         _content.Controls.Add(footer, 0, 1);
         _content.SetColumnSpan(footer, 2);
         Controls.Add(_content);
@@ -139,8 +156,9 @@ internal sealed class SettingsForm : Form
     {
         var button = new Button
         {
-            Name = "Settings" + id, Text = title, Width = 124, Height = 38, TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(8, 0, 0, 0), Margin = new Padding(0, 0, 0, 4), FlatStyle = FlatStyle.Flat
+            Name = "Settings" + id, Text = title, Width = 196, Height = 48, TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(12, 0, 12, 0), Margin = new Padding(0, 0, 0, 4), FlatStyle = FlatStyle.Flat,
+            UseVisualStyleBackColor = false
         };
         button.FlatAppearance.BorderSize = 0;
         button.Click += (_, _) => SelectCategory(id);
@@ -148,16 +166,39 @@ internal sealed class SettingsForm : Form
         var page = new FlowLayoutPanel
         {
             Name = id + "Page", Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, AutoScroll = true, Padding = new Padding(24), Margin = Padding.Empty, Visible = false
+            WrapContents = false, AutoScroll = true, BackColor = AppTheme.Surface,
+            Padding = new Padding(32), Margin = Padding.Empty, Visible = false
         };
         page.Controls.Add(new Label
         {
-            Text = title, AutoSize = true, Font = new Font(Font.FontFamily, 14, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 20)
+            Text = title, AutoSize = true, Font = new Font(Font.FontFamily, 18, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 24)
         });
         _pages.Controls.Add(page);
         _categories.Add(id, (button, page));
+        page.Layout += (_, _) => SizePageContents(page);
         return page;
+    }
+
+    private void SizePageContents(FlowLayoutPanel page)
+    {
+        if (_layingOutPages) return;
+        _layingOutPages = true;
+        try
+        {
+            var width = Math.Max(1, page.ClientSize.Width - page.Padding.Horizontal);
+            foreach (Control control in page.Controls)
+            {
+                var available = Math.Max(1, width - control.Margin.Horizontal);
+                if (control is Label || control is CheckBox { AutoSize: true })
+                    control.MaximumSize = new Size(available, 0);
+                else if (control is NotificationToggle toggle)
+                    toggle.Size = toggle.GetPreferredSize(new Size(available, 0));
+                else
+                    control.Width = available;
+            }
+        }
+        finally { _layingOutPages = false; }
     }
 
     private void SelectCategory(string id)
@@ -337,7 +378,13 @@ internal sealed class SettingsForm : Form
     private void Place(DisplayPosition position)
     {
         var area = (Screen.PrimaryScreen ?? Screen.FromControl(this)).WorkingArea;
-        Location = WindowPlacement.Calculate(area, Size, position, (int)Math.Round(16 * DeviceDpi / 96d));
+        var margin = LogicalToDeviceUnits(16);
+        // Keep the footer reachable on small displays and at high DPI. Pages
+        // scroll vertically when the available work area cannot fit the content.
+        var available = new Size(Math.Max(1, area.Width - 2 * margin), Math.Max(1, area.Height - 2 * margin));
+        if (Width > available.Width || Height > available.Height)
+            Size = new Size(Math.Min(Width, available.Width), Math.Min(Height, available.Height));
+        Location = WindowPlacement.Calculate(area, Size, position, margin);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
