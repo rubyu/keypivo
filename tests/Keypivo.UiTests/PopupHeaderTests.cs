@@ -47,7 +47,7 @@ internal static class PopupHeaderTests
         var defaultFont = popup.Font;
         foreach (var textScale in new[] { 1f, 1.5f, 2f })
         {
-            using var font = new Font("Segoe UI", 11 * textScale);
+            using var font = new Font("Segoe UI", 12 * textScale);
             popup.Font = font;
             foreach (var current in new[] { snapshot, DeviceSnapshot.FromDevices([key with { ClientIPAddress = "172.22.0.2" }]), new DeviceSnapshot(ConnectionState.ToolMissing, null, 0, "Not installed") })
             {

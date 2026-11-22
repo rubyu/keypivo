@@ -37,7 +37,7 @@ internal sealed class StatusForm : Form
     public StatusForm()
     {
         Text = "Keypivo";
-        Font = new Font("Segoe UI", 11);
+        Font = new Font("Segoe UI", 12);
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.None;
@@ -73,7 +73,7 @@ internal sealed class StatusForm : Form
         brand.Controls.Add(_logo);
         brand.Controls.Add(new Label
         {
-            Text = "Keypivo", AutoSize = true, Font = new Font(Font.FontFamily, 11, FontStyle.Bold),
+            Text = "Keypivo", AutoSize = true, Font = new Font(Font.FontFamily, 12, FontStyle.Bold),
             Margin = new Padding(0, 1, 0, 0)
         });
         var tools = new FlowLayoutPanel
@@ -93,7 +93,7 @@ internal sealed class StatusForm : Form
         };
         state.Controls.Add(new Label
         {
-            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 14, FontStyle.Bold), Margin = Padding.Empty
+            Text = "Security key", AutoSize = true, Font = new Font(Font.FontFamily, 16, FontStyle.Bold), Margin = Padding.Empty
         });
         _status = new Label
         {
