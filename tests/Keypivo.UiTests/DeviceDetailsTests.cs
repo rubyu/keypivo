@@ -23,8 +23,8 @@ internal static class DeviceDetailsTests
         var heading = Find<Label>(popup, "DeviceHeading");
         Assert(heading.Text == device.Description && !heading.UseMnemonic, "The heading must display the selected device description literally");
         Program.CaptureScreen(popup, "description-heading");
-        Assert(heading.Right < info.Left && heading.Height > heading.Font.Height && heading.Height <= heading.Font.Height * 3,
-            $"A description must wrap within three lines beside the information icon: heading={heading.Bounds}, info={info.Bounds}, lineHeight={heading.Font.Height}");
+        Assert(heading.Right < info.Left && heading.Height >= heading.GetPreferredSize(new Size(heading.Width, 0)).Height,
+            $"The sample description must fit completely beside the information icon: heading={heading.Bounds}, info={info.Bounds}, preferred={heading.GetPreferredSize(new Size(heading.Width, 0))}");
         var panel = Find<DeviceDetailsPanel>(popup, "DeviceDetails");
         var product = Find<Label>(popup, "ProductValue");
         var guid = Find<Label>(popup, "PersistedGUIDValue");
@@ -105,7 +105,7 @@ internal static class DeviceDetailsTests
         info.PerformClick();
         Application.DoEvents();
         Assert(panel.VerticalScroll.Visible && !panel.HorizontalScroll.Visible, "Long descriptions must scroll within the detail area");
-        Assert(heading.Text == longDescription && heading.AutoEllipsis && heading.Height <= heading.Font.Height * 3,
+        Assert(heading.Text == longDescription && heading.AutoEllipsis && heading.Height <= TextRenderer.MeasureText("Ag", heading.Font).Height * 3,
             "An unusually long heading must be bounded while retaining its full accessible text");
         Assert(heading.Right < info.Left, "A long heading must leave the information icon accessible");
         CheckRows(panel);

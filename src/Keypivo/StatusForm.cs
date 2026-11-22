@@ -241,7 +241,9 @@ internal sealed class StatusForm : Form
         // Keep the action visible even for unusually long Windows descriptions.
         // The full description remains available in the tooltip and details.
         var preferred = _deviceHeading.GetPreferredSize(new Size(_deviceHeading.Width, 0)).Height;
-        _deviceHeading.Height = Math.Max(_info.Height, Math.Min(preferred, _deviceHeading.Font.Height * 3));
+        var threeLines = TextRenderer.MeasureText("Ag\nAg\nAg", _deviceHeading.Font,
+            new Size(_deviceHeading.Width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
+        _deviceHeading.Height = Math.Max(_info.Height, Math.Min(preferred, threeLines));
     }
 
     protected override void OnLayout(LayoutEventArgs levent)
