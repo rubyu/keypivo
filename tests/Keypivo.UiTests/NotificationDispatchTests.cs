@@ -96,6 +96,7 @@ internal static class NotificationDispatchTests
     private sealed class Fixture : IDisposable
     {
         private readonly string _path = Path.Combine(Path.GetTempPath(), "keypivo-delivery-" + Guid.NewGuid().ToString("N") + ".json");
+        private readonly SynchronizationContext? _previousContext = SynchronizationContext.Current;
         public Client Client { get; } = new();
         public SwitchController Controller { get; }
         public TrayApplicationContext Context { get; }
@@ -105,6 +106,10 @@ internal static class NotificationDispatchTests
 
         public Fixture(NotificationSettings settings, ConnectionState initial = ConnectionState.WindowsShared, bool recovered = false)
         {
+            // These fixtures pump messages without Application.Run. ExitThread in
+            // the previous fixture uninstalls its UI context, so explicitly give
+            // every fixture the same continuation routing as the real app loop.
+            SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
             Client.SetState(initial);
             Controller = new(Client, verification: new()
             {
@@ -120,6 +125,7 @@ internal static class NotificationDispatchTests
         public void Apply(NotificationSettings settings) => Finish(Context.ApplySettingsAsync(new() { Position = DisplayPosition.Center, Notifications = settings }));
         public void Switch()
         {
+            Assert(SynchronizationContext.Current is WindowsFormsSynchronizationContext, "Switch continuations must run on the UI thread");
             var button = Find<Button>(Popup, "SwitchAction");
             button.PerformClick();
             PumpUntil(() => button.Enabled);
@@ -128,6 +134,7 @@ internal static class NotificationDispatchTests
         {
             Context.ExitThread();
             Context.Dispose();
+            SynchronizationContext.SetSynchronizationContext(_previousContext);
             File.Delete(_path);
         }
     }
