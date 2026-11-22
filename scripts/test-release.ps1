@@ -39,7 +39,15 @@ function gh {
                 @{ name = $file.Name; size = $file.Length }
             }
         }
+        'release edit' {
+            if (-not $global:KeypivoReleaseTestState.Release.isDraft -or '--notes-file' -notin $arguments) { throw 'Only draft notes may be refreshed.' }
+        }
         'api --method' {
+            if ($arguments[2] -eq 'POST' -and $arguments[3] -eq 'repos/rubyu/keypivo/releases/generate-notes') {
+                if ($global:KeypivoReleaseTestState.FailNotes) { $global:LASTEXITCODE = 1; return }
+                @{ body = "## What's Changed`n`n- Improve device details (#123)" } | ConvertTo-Json
+                return
+            }
             if ($arguments[2] -ne 'PATCH' -or 'draft=false' -notin $arguments) { throw 'Unexpected release update.' }
             if ($global:KeypivoReleaseTestState.Release.assets.Count -ne 2) { throw 'Publication must wait for both assets.' }
             $global:KeypivoReleaseTestState.Release.isDraft = $false
@@ -49,7 +57,7 @@ function gh {
 }
 
 function Reset-State {
-    $global:KeypivoReleaseTestState = @{ Release = $null; Tag = $null; FailUpload = $false; Calls = [Collections.Generic.List[string]]::new() }
+    $global:KeypivoReleaseTestState = @{ Release = $null; Tag = $null; FailUpload = $false; FailNotes = $false; Calls = [Collections.Generic.List[string]]::new() }
 }
 function Assert($condition, [string]$message) { if (-not $condition) { throw $message } }
 function Publish { & (Join-Path $PSScriptRoot 'publish-release.ps1') @parameters }
@@ -64,8 +72,8 @@ Assert (-not $global:KeypivoReleaseTestState.Release.isDraft) 'A successful uplo
 $checksum = Get-Content -LiteralPath (Join-Path $testDirectory 'SHA256SUMS.txt') -Raw
 Assert ($checksum.Trim() -ceq ((Get-FileHash $packagePath).Hash.ToLowerInvariant() + '  keypivo-1.0.123.0-x64.msix')) 'Checksum must match the package.'
 $notes = Get-Content -LiteralPath (Join-Path $testDirectory 'release-notes.md') -Raw
-Assert ($notes.Contains($parameters.RunUrl) -and $notes.Contains($commit) -and $notes.Contains('Microsoft Store submission')) 'Notes must identify the tested source and Store submission purpose.'
-Write-Output 'PASS Release: draft, package/checksum upload, then publication with source and CI links.'
+Assert ($notes.Contains('https://apps.microsoft.com/detail/9P9S5NCN2DQ4') -and $notes.Contains('Improve device details (#123)')) 'Public notes must include the install link and generated changes.'
+Write-Output 'PASS Release: generated changes, draft, package/checksum upload, then publication.'
 
 $global:KeypivoReleaseTestState.Tag = $commit
 $global:KeypivoReleaseTestState.Calls.Clear()
@@ -95,6 +103,12 @@ $global:KeypivoReleaseTestState.FailUpload = $true
 Expect-Failure 'GitHub CLI failed: release upload'
 Assert ($global:KeypivoReleaseTestState.Release.isDraft -and -not ($global:KeypivoReleaseTestState.Calls | Where-Object { $_ -like 'api --method PATCH*' })) 'Upload failure must leave the release unpublished.'
 Write-Output 'PASS Release: upload failure never publishes a partial release.'
+
+Reset-State
+$global:KeypivoReleaseTestState.FailNotes = $true
+Expect-Failure 'GitHub CLI failed: api --method'
+Assert ($null -eq $global:KeypivoReleaseTestState.Release) 'Release-note generation must succeed before creating a release.'
+Write-Output 'PASS Release: failed note generation stops before publication.'
 
 $parameters.Version = '1.0.124.0'
 $global:KeypivoReleaseTestState.Calls.Clear()

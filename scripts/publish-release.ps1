@@ -56,23 +56,21 @@ $hash = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToL
 $checksumPath = Join-Path $package.DirectoryName 'SHA256SUMS.txt'
 [IO.File]::WriteAllText($checksumPath, "$hash  $($package.Name)`n")
 $notesPath = Join-Path $package.DirectoryName 'release-notes.md'
+$generated = Invoke-Gh @('api', '--method', 'POST', "repos/$Repository/releases/generate-notes",
+    '-f', "tag_name=$tag", '-f', "target_commitish=$Commit") | ConvertFrom-Json
 $notes = @"
-Download **$($package.Name)** and upload it to Keypivo's update submission in [Microsoft Partner Center](https://partner.microsoft.com/dashboard).
+Get Keypivo from the [Microsoft Store](https://apps.microsoft.com/detail/9P9S5NCN2DQ4).
 
-This unsigned MSIX is prepared for Microsoft Store submission. To install Keypivo, use the [Microsoft Store](https://apps.microsoft.com/detail/9P9S5NCN2DQ4).
-
-- Package version: $Version (x64)
-- Source: [$Commit](https://github.com/$Repository/commit/$Commit)
-- Validation: [CI build, tests, and package checks]($RunUrl)
-- SHA-256: $hash
-
-GitHub Release publication does not submit or update the Microsoft Store listing.
+$($generated.body.Trim())
 "@
 [IO.File]::WriteAllText($notesPath, $notes)
 if ($null -eq $release) {
     Invoke-Gh @('release', 'create', $tag, '--repo', $Repository, '--target', $Commit,
         '--title', "Keypivo $Version", '--notes-file', $notesPath, '--draft') | Out-Null
     $release = Read-Release
+}
+else {
+    Invoke-Gh @('release', 'edit', $tag, '--repo', $Repository, '--notes-file', $notesPath) | Out-Null
 }
 # Upload while still a draft so an interrupted upload never exposes an incomplete release.
 Invoke-Gh @('release', 'upload', $tag, $package.FullName, $checksumPath, '--repo', $Repository, '--clobber') | Out-Null
@@ -83,4 +81,6 @@ Invoke-Gh @('api', '--method', 'PATCH', "repos/$Repository/releases/$($release.d
 $release = Read-Release
 if ($release.isDraft) { throw 'The release is still a draft.' }
 Write-Output "GitHub Release: $($release.url)"
-if ($env:GITHUB_STEP_SUMMARY) { "GitHub Release: $($release.url)" >> $env:GITHUB_STEP_SUMMARY }
+if ($env:GITHUB_STEP_SUMMARY) {
+    "GitHub Release: $($release.url)`n`n[Build and package validation]($RunUrl)" >> $env:GITHUB_STEP_SUMMARY
+}
