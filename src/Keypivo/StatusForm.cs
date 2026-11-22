@@ -8,12 +8,17 @@ internal sealed class StatusForm : Form
 {
     private readonly FlowLayoutPanel _layout;
     private readonly SetupPage _setupPage = new() { Visible = false, Location = new Point(1, 1) };
-    private readonly PictureBox _logo = new() { Size = new(22, 22), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 8, 0) };
+    private readonly PictureBox _logo = new() { Size = new(23, 23), SizeMode = PictureBoxSizeMode.Zoom, Margin = new(0, 0, 10, 0), TabStop = false };
     private readonly Label _status;
-    private readonly Button _switch = MenuButton("Switch to WSL", primary: true);
-    private readonly Button _refresh = MenuButton("Refresh status");
-    private readonly Button _settings = MenuButton("Settings");
-    private readonly Button _exit = MenuButton("Exit");
+    private readonly Label _deviceHeading;
+    private readonly Button _switch = new PopupButton { Text = "Switch to WSL", Margin = new Padding(24, 0, 24, 0) };
+    private readonly Button _refresh = new PopupButton(PopupGlyph.Refresh) { Name = "RefreshStatus", AccessibleName = "Refresh status", Margin = new Padding(0, 0, 4, 0) };
+    private readonly Button _settings = new PopupButton(PopupGlyph.Settings) { Name = "OpenSettings", AccessibleName = "Settings", Margin = new Padding(0, 0, 4, 0) };
+    private readonly Button _exit = new PopupButton(PopupGlyph.Power) { Name = "ExitApplication", AccessibleName = "Exit Keypivo" };
+    private readonly ToolTip _toolTip = new();
+    private readonly PopupButton _info = new(PopupGlyph.Info) { Name = "ToggleDeviceDetails", AccessibleName = "Show all device details", BackColor = AppTheme.Surface };
+    private readonly DeviceDetailsPanel _deviceDetails = new();
+    private bool _sizingDetails;
     private readonly Button _details = MenuButton("View details");
     private Icon? _lastIcon;
     private (DeviceSnapshot Snapshot, bool Busy, bool Refreshing, string? Error, Icon Icon, bool Unconfirmed)? _lastPresentation;
@@ -36,7 +41,7 @@ internal sealed class StatusForm : Form
     public StatusForm()
     {
         Text = "Keypivo";
-        Font = new Font("Segoe UI", 10);
+        Font = new Font("Segoe UI", 12);
         AutoScaleDimensions = new SizeF(96, 96);
         AutoScaleMode = AutoScaleMode.Dpi;
         FormBorderStyle = FormBorderStyle.None;
@@ -44,6 +49,7 @@ internal sealed class StatusForm : Form
         StartPosition = FormStartPosition.Manual;
         BackColor = AppTheme.Surface;
         ForeColor = AppTheme.Text;
+        DoubleBuffered = true;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Padding = new Padding(1);
@@ -52,41 +58,75 @@ internal sealed class StatusForm : Form
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Location = new Point(1, 1), Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 5)
+            Name = "MenuLayout", Location = new Point(1, 1), Margin = Padding.Empty
         };
-        var header = new FlowLayoutPanel
+        var header = new TableLayoutPanel
         {
+            Name = "MenuHeader", ColumnCount = 2, RowCount = 1,
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Width = 318, MinimumSize = new Size(318, 0), Margin = Padding.Empty,
-            Padding = new Padding(16, 15, 16, 10), WrapContents = false
+            Width = 438, MinimumSize = new Size(438, 0), Margin = Padding.Empty,
+            Padding = new Padding(22, 12, 14, 12), BackColor = AppTheme.Chrome
         };
-        header.Controls.Add(_logo);
-        header.Controls.Add(new Label
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var brand = new FlowLayoutPanel
         {
-            Text = "Keypivo", AutoSize = true, Font = new Font(Font, FontStyle.Bold),
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false,
+            Anchor = AnchorStyles.Left, Margin = Padding.Empty
+        };
+        brand.Controls.Add(_logo);
+        brand.Controls.Add(new Label
+        {
+            Text = "Keypivo", AutoSize = true, Font = new Font(Font.FontFamily, 12, FontStyle.Bold),
             Margin = new Padding(0, 1, 0, 0)
         });
+        var tools = new FlowLayoutPanel
+        {
+            Name = "HeaderActions", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty
+        };
+        tools.Controls.AddRange([_refresh, _settings, _exit]);
+        foreach (Control button in tools.Controls) _toolTip.SetToolTip(button, button.AccessibleName);
+        header.Controls.Add(brand, 0, 0);
+        header.Controls.Add(tools, 1, 0);
         var state = new FlowLayoutPanel
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(318, 0), FlowDirection = FlowDirection.TopDown,
-            WrapContents = false, Margin = Padding.Empty, Padding = new Padding(18, 8, 18, 15)
+            MinimumSize = new Size(438, 0), FlowDirection = FlowDirection.TopDown,
+            WrapContents = false, Margin = Padding.Empty, Padding = new Padding(24, 32, 24, 32)
         };
-        state.Controls.Add(new Label
+        var title = new TableLayoutPanel
         {
-            Text = "Security key", AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = Padding.Empty
-        });
+            Name = "DeviceTitle", Width = 390, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(390, 0), ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
+        };
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _deviceHeading = new Label
+        {
+            Name = "DeviceHeading", Text = "-", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
+            Width = 342, Height = 40, AutoEllipsis = true, UseMnemonic = false,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left
+        };
+        _deviceHeading.FontChanged += (_, _) => SizeDeviceHeading();
+        _deviceHeading.SizeChanged += (_, _) => SizeDeviceHeading();
+        _info.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        title.Controls.Add(_deviceHeading, 0, 0);
+        title.Controls.Add(_info, 1, 0);
+        state.Controls.Add(title);
+        _toolTip.SetToolTip(_info, _info.AccessibleName);
         _status = new Label
         {
-            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(282, 0),
-            ForeColor = AppTheme.Muted, Margin = new Padding(0, 3, 0, 0)
+            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(390, 0),
+            ForeColor = AppTheme.Muted, Margin = new Padding(0, 6, 0, 0)
         };
         state.Controls.Add(_status);
         _details.Visible = false;
         _switch.Name = "SwitchAction";
         _details.Name = "StatusDetails";
         _details.ForeColor = AppTheme.Error;
-        _layout.Controls.AddRange([header, state, _details, Separator(), _switch, _refresh, _settings, Separator(), _exit]);
+        _layout.Controls.AddRange([header, Separator(), state, _details, _switch, _deviceDetails]);
         Controls.AddRange([_layout, _setupPage]);
 
         _switch.Click += (_, _) => SwitchRequested?.Invoke();
@@ -94,6 +134,13 @@ internal sealed class StatusForm : Form
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
         _exit.Click += (_, _) => ExitRequested?.Invoke();
         _details.Click += (_, _) => DetailsRequested?.Invoke();
+        _info.Click += (_, _) =>
+        {
+            _deviceDetails.Toggle();
+            _info.Selected = _deviceDetails.Expanded;
+            _info.AccessibleName = _deviceDetails.Expanded ? "Show compact device details" : "Show all device details";
+            _toolTip.SetToolTip(_info, _info.AccessibleName);
+        };
         _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
         _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
         _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
@@ -113,6 +160,10 @@ internal sealed class StatusForm : Form
         if (_lastPresentation == presentation) return;
         _lastPresentation = presentation;
         SuspendLayout();
+        var description = snapshot.Device?.Description;
+        _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "-" : description;
+        SizeDeviceHeading();
+        _toolTip.SetToolTip(_deviceHeading, _deviceHeading.Text);
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"
             : snapshot.Device?.IsAttached == true ? "Switch to Windows"
@@ -124,6 +175,7 @@ internal sealed class StatusForm : Form
         _details.Visible = snapshot.State != ConnectionState.ToolMissing && !string.IsNullOrEmpty(error ?? snapshot.Error);
         _details.Text = error is null ? "View details" : unconfirmed ? "Not confirmed · View details" : "Action failed · View details";
         _details.ForeColor = unconfirmed ? AppTheme.Muted : AppTheme.Error;
+        _deviceDetails.Render(snapshot.Device);
         if (!ReferenceEquals(_lastIcon, icon))
         {
             _logo.Image?.Dispose();
@@ -184,6 +236,30 @@ internal sealed class StatusForm : Form
         Location = WindowPlacement.Calculate(area, Size, _position, (int)Math.Round(16 * DeviceDpi / 96d));
     }
 
+    private void SizeDeviceHeading()
+    {
+        // Keep the action visible even for unusually long Windows descriptions.
+        // The full description remains available in the tooltip and details.
+        var preferred = _deviceHeading.GetPreferredSize(new Size(_deviceHeading.Width, 0)).Height;
+        var threeLines = TextRenderer.MeasureText("Ag\nAg\nAg", _deviceHeading.Font,
+            new Size(_deviceHeading.Width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
+        _deviceHeading.Height = Math.Max(_info.Height, Math.Min(preferred, threeLines));
+    }
+
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        if (_layout is null || _sizingDetails) return;
+        _sizingDetails = true;
+        try
+        {
+            var area = (Screen.PrimaryScreen ?? Screen.FromControl(this)).WorkingArea;
+            var available = area.Height - (int)Math.Round(32 * DeviceDpi / 96d) - (_layout.Height - _deviceDetails.Height) - 2;
+            _deviceDetails.LimitHeight(Math.Max(80, available));
+        }
+        finally { _sizingDetails = false; }
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
@@ -222,31 +298,35 @@ internal sealed class StatusForm : Form
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _logo.Image?.Dispose();
+        if (disposing)
+        {
+            _toolTip.Dispose();
+            _logo.Image?.Dispose();
+        }
         base.Dispose(disposing);
     }
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
-    private static Button MenuButton(string text, bool primary = false)
+    private static Button MenuButton(string text)
     {
         var button = new Button
         {
-            Text = text, Width = 308, Height = 42, Margin = new Padding(5, 0, 5, 0),
+            Text = text, Width = 422, Height = 56, Margin = new Padding(8, 0, 8, 0),
             FlatStyle = FlatStyle.Flat, TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(12, 0, 12, 0), TabStop = true,
-            BackColor = primary ? AppTheme.AccentSurface : AppTheme.Surface,
+            Padding = new Padding(16, 0, 16, 0), TabStop = true,
+            BackColor = AppTheme.Surface,
             ForeColor = AppTheme.Text, UseVisualStyleBackColor = false
         };
         button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = primary ? AppTheme.AccentHover : AppTheme.Hover;
+        button.FlatAppearance.MouseOverBackColor = AppTheme.Hover;
         button.FlatAppearance.MouseDownBackColor = AppTheme.AccentHover;
         return button;
     }
 
     private static Panel Separator() => new()
     {
-        BackColor = AppTheme.Border, Height = 1, Width = 318, Margin = new Padding(0, 5, 0, 5)
+        BackColor = AppTheme.Border, Height = 1, Width = 438, Margin = Padding.Empty
     };
 }

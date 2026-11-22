@@ -19,13 +19,19 @@ Native UI checks cover setup routing, command visibility, copy guards, incomplet
 
 Popup checks exercise native foreground focus and ordering above another topmost window, reopening, dismissal, and releasing topmost status while instructions or Settings stay open. The attached state must read **Connected to WSL** in the menu and the shared text used by notifications and the tray tooltip. These checks use ordinary test windows; the Windows notification-area overflow still requires the manual check below.
 
+Header checks cover equally spaced Refresh, Settings, and Exit icons, their accessible names and tooltips, action routing, busy-state guards, keyboard order, and 100/150/200% body-text layout. Custom icon and primary-button painting must cover stale pixels and preserve partial repaint bounds.
+
 Polling checks exercise the application context with a delayed fake device read. Unchanged automatic reads must leave controls enabled and cause no menu or setup layout events. A user action waits for a pending read and runs once; explicit refresh, setup navigation, changed snapshots, and shutdown remain functional.
 
 Startup UI checks use a simulated Windows startup service: on/off save, cancellation, unchanged settings, user/policy restrictions, read and update failures, and concurrent external changes. They never register a startup task on the test PC. Package checks require exactly one default-enabled `KeypivoStartup` task targeting `keypivo.exe` and reject immediate-install registration.
 
 Notification checks cover defaults and older settings, individual preferences, the master switch retaining choices, persistence, recovery, and state mapping. Native checks exercise category navigation, control bounds, Save/Cancel, validation from another page, and accessible switch actions. Delivery checks capture notification requests instead of showing Windows balloons and exercise startup, every connection state, operation failures, confirmation timeouts, late recovery, live preference changes, and duplicate suppression.
 
-Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, and logos.
+Rendering checks verify that switches repaint their full background, erase old labels, and respect a partial paint clip. Settings navigation and scrolling are exercised with body text at 100%, 150%, and 200% of its default size. CI also captures the visible menu and Settings window directly from the Windows desktop, alongside the control-rendered previews. Physical monitor DPI changes remain part of manual acceptance.
+
+Device-detail checks cover offline USB ID lookups, vendor/product scoping, malformed IDs, class/interface sections, and unknown-name fallbacks. Native checks cover compact/full toggling, aligned value columns, the divider after Vendor, live connection and sharing states, clearing removed devices, unchanged polling, 100/150/200% body text, and scrolling long descriptions within the working area.
+
+Package checks require `runFullTrust`, reject `allowElevation`, and validate the identity, runtime, entry point, license, third-party notices, and logos.
 
 Local Release compilation is supported. Runtime execution on the development PC is blocked by Windows application control (`0x800711C7`), so runtime evidence comes from GitHub's Windows CI. Application-control and USB settings are not changed to run tests. See the latest PR check results for the exact tested commit.
 

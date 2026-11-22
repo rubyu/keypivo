@@ -4,4 +4,7 @@
     <AssemblyName>keypivo.core</AssemblyName>
     <RootNamespace>Keypivo.Core</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../data/usb.ids" LogicalName="Keypivo.Core.usb.ids" />
+  </ItemGroup>
 </Project>
