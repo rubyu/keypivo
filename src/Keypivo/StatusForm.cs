@@ -109,7 +109,6 @@ internal sealed class StatusForm : Form
             TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
             Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
-        _deviceHeading.TextChanged += (_, _) => SizeDeviceHeading();
         _deviceHeading.FontChanged += (_, _) => SizeDeviceHeading();
         _deviceHeading.SizeChanged += (_, _) => SizeDeviceHeading();
         _info.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -163,6 +162,7 @@ internal sealed class StatusForm : Form
         SuspendLayout();
         var description = snapshot.Device?.Description;
         _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "-" : description;
+        SizeDeviceHeading();
         _toolTip.SetToolTip(_deviceHeading, _deviceHeading.Text);
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"

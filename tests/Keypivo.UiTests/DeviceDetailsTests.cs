@@ -22,8 +22,9 @@ internal static class DeviceDetailsTests
         var info = Find<PopupButton>(popup, "ToggleDeviceDetails");
         var heading = Find<Label>(popup, "DeviceHeading");
         Assert(heading.Text == device.Description && !heading.UseMnemonic, "The heading must display the selected device description literally");
-        Assert(heading.Right < info.Left && heading.Height >= heading.GetPreferredSize(new Size(heading.Width, 0)).Height,
-            "A normal description must wrap without overlapping the information icon");
+        Program.CaptureScreen(popup, "description-heading");
+        Assert(heading.Right < info.Left && heading.Height > heading.Font.Height && heading.Height <= heading.Font.Height * 3,
+            $"A description must wrap within three lines beside the information icon: heading={heading.Bounds}, info={info.Bounds}, lineHeight={heading.Font.Height}");
         var panel = Find<DeviceDetailsPanel>(popup, "DeviceDetails");
         var product = Find<Label>(popup, "ProductValue");
         var guid = Find<Label>(popup, "PersistedGUIDValue");
