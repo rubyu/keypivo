@@ -30,6 +30,8 @@ internal static class DeviceDetailsTests
         var guidCaption = Find<Label>(popup, "PersistedGUIDCaption");
         Assert(TextRenderer.MeasureText(guidCaption.Text, guidCaption.Font).Width <= guidCaption.Width,
             "The Persisted GUID caption must fit on one line at the default text size");
+        Assert(TextRenderer.MeasureText(guid.Text, guid.Font).Width <= guid.Width,
+            "A standard GUID must fit on one line at the default text size");
         var valueLeft = product.Left;
         Program.CaptureScreen(popup, "details-compact");
 

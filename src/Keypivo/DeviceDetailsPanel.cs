@@ -116,9 +116,9 @@ internal sealed class DeviceDetailsPanel : Panel
             // columns in both modes while accommodating enlarged body text.
             var labelWidth = Math.Clamp(_rows.Max(row => TextRenderer.MeasureText(row.Caption.Text, row.Caption.Font).Width), Scale(105), Scale(160));
             var valueLeft = left + labelWidth + Scale(12);
-            // Reserve the scrollbar width in both modes so values never move
-            // horizontally when the expanded list needs to scroll.
-            var valueWidth = Math.Max(Scale(80), Width - valueLeft - left - SystemInformation.VerticalScrollBarWidth);
+            // The right inset also accommodates the scrollbar. Keep the full
+            // value column in both modes instead of reserving that space twice.
+            var valueWidth = Math.Max(Scale(80), Width - valueLeft - left);
             var y = Scale(20);
             for (var i = 0; i < _rows.Length; i++)
             {
@@ -133,7 +133,7 @@ internal sealed class DeviceDetailsPanel : Panel
                 y += rowHeight + Scale(12);
                 if (i == 1)
                 {
-                    _separator.SetBounds(left, y + AutoScrollPosition.Y, Width - left * 2 - SystemInformation.VerticalScrollBarWidth, Scale(1));
+                    _separator.SetBounds(left, y + AutoScrollPosition.Y, Width - left * 2, Scale(1));
                     y += Scale(17);
                 }
             }
