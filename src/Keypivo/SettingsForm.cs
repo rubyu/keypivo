@@ -36,6 +36,8 @@ internal sealed class SettingsForm : Form
 
     public SettingsForm(AppSettings settings, bool canUnshare, bool isAttached, Func<AppSettings, Task> apply, IStartupService? startupService = null)
     {
+        // Scale the complete control tree once, including the dialog bounds.
+        SuspendLayout();
         _original = settings;
         _canUnshare = canUnshare && !isAttached;
         _apply = apply;
@@ -51,7 +53,7 @@ internal sealed class SettingsForm : Form
         StartPosition = FormStartPosition.Manual;
         BackColor = AppTheme.Surface;
         ForeColor = AppTheme.Text;
-        ClientSize = new Size(800, 640);
+        ClientSize = new Size(920, 760);
         DoubleBuffered = true;
 
         _content = new TableLayoutPanel
@@ -108,7 +110,7 @@ internal sealed class SettingsForm : Form
         };
         var footer = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Name = "SettingsFooter", Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 1, RowCount = 2, Padding = new Padding(28, 16, 28, 24), Margin = Padding.Empty
         };
         footer.ColumnStyles.Add(new(SizeType.Percent, 100));
@@ -150,6 +152,7 @@ internal sealed class SettingsForm : Form
         SizeChanged += (_, _) => { if (Visible) Place(settings.Position); };
         SelectCategory("General");
         UpdateUnshare();
+        ResumeLayout(true);
     }
 
     private FlowLayoutPanel AddCategory(FlowLayoutPanel navigation, string id, string title)
@@ -197,6 +200,12 @@ internal sealed class SettingsForm : Form
                 else
                     control.Width = available;
             }
+            // Include the trailing inset in the scroll range. The last switch
+            // must be fully reachable above the separate Save/Cancel footer.
+            var height = page.Padding.Vertical + page.Controls.Cast<Control>()
+                .Where(control => control.Visible)
+                .Sum(control => control.Height + control.Margin.Vertical);
+            page.AutoScrollMinSize = new Size(0, height);
         }
         finally { _layingOutPages = false; }
     }

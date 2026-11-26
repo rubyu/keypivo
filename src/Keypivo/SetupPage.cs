@@ -32,11 +32,11 @@ internal sealed class SetupPage : FlowLayoutPanel
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         FlowDirection = FlowDirection.TopDown;
         WrapContents = false;
-        Width = 438;
+        Width = PopupLayout.Width;
         Margin = Padding.Empty;
         BackColor = AppTheme.Surface;
 
-        var header = Column(438, new Padding(20, 20, 20, 4));
+        var header = Column(PopupLayout.Width, new Padding(20, 20, 20, 4));
         header.FlowDirection = FlowDirection.LeftToRight;
         _back = new Button
         {
@@ -47,29 +47,29 @@ internal sealed class SetupPage : FlowLayoutPanel
         header.Controls.Add(_back);
         header.Controls.Add(new Label { Text = "Keypivo", AutoSize = true, Font = new Font("Segoe UI", 13, FontStyle.Bold), Margin = new Padding(10, 6, 0, 0) });
         Controls.Add(header);
-        var content = Column(438, new Padding(24, 24, 24, 28));
-        _symbol = new PictureBox { Size = new Size(40, 40), SizeMode = PictureBoxSizeMode.Zoom, Margin = new Padding(175, 0, 0, 22), TabStop = false };
-        _title = TextLabel(390, new Font("Segoe UI", 16, FontStyle.Bold));
+        var content = Column(PopupLayout.Width, new Padding(24, 24, 24, 28));
+        _symbol = new PictureBox { Size = new Size(40, 40), SizeMode = PictureBoxSizeMode.Zoom, Margin = new Padding((PopupLayout.ContentWidth - 40) / 2, 0, 0, 22), TabStop = false };
+        _title = TextLabel(PopupLayout.ContentWidth, new Font("Segoe UI", 16, FontStyle.Bold));
         _title.Name = "SetupTitle";
         _title.Margin = new Padding(0, 0, 0, 7);
-        _subtitle = TextLabel(390);
+        _subtitle = TextLabel(PopupLayout.ContentWidth);
         _subtitle.ForeColor = AppTheme.Muted;
         _subtitle.Margin = new Padding(0, 0, 0, 27);
-        _commandLabel = TextLabel(390);
+        _commandLabel = TextLabel(PopupLayout.ContentWidth);
         _commandLabel.Margin = new Padding(0, 0, 0, 12);
-        var commandBox = Column(390, new Padding(12));
+        var commandBox = Column(PopupLayout.ContentWidth, new Padding(12));
         commandBox.Name = "CommandBox";
         commandBox.BackColor = AppTheme.Hover;
         commandBox.Margin = new Padding(0, 0, 0, 7);
         commandBox.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, commandBox.ClientRectangle, AppTheme.Border, ButtonBorderStyle.Solid);
-        _command = TextLabel(366, new Font("Consolas", 10.5f));
+        _command = TextLabel(PopupLayout.ContentWidth - 24, new Font("Consolas", 10.5f));
         _command.Name = "SetupCommand";
         _command.AccessibleName = "Command to run manually";
         _command.TextAlign = ContentAlignment.MiddleLeft;
         commandBox.Controls.Add(_command);
         _copy = new Button
         {
-            Name = "CopyCommand", Text = "Copy command", AccessibleName = "Copy command", Width = 390, Height = 44,
+            Name = "CopyCommand", Text = "Copy command", AccessibleName = "Copy command", Width = PopupLayout.ContentWidth, Height = 44,
             FlatStyle = FlatStyle.Flat, ForeColor = AppTheme.Accent, BackColor = AppTheme.Surface,
             Margin = new Padding(0, 0, 0, 20)
         };
@@ -78,11 +78,11 @@ internal sealed class SetupPage : FlowLayoutPanel
         _help = new LinkLabel
         {
             Name = "InstallationHelp", Text = "Other installation options", AccessibleName = "Other installation options (opens Microsoft Learn)",
-            Width = 390, Height = 30, TextAlign = ContentAlignment.MiddleCenter,
+            Width = PopupLayout.ContentWidth, Height = 30, TextAlign = ContentAlignment.MiddleCenter,
             LinkColor = AppTheme.Muted, ActiveLinkColor = AppTheme.Accent, VisitedLinkColor = AppTheme.Muted,
             LinkBehavior = LinkBehavior.HoverUnderline, Margin = new Padding(0, 0, 0, 20)
         };
-        _feedback = TextLabel(390);
+        _feedback = TextLabel(PopupLayout.ContentWidth);
         _feedback.Name = "SetupFeedback";
         _feedback.TextAlign = ContentAlignment.MiddleLeft;
         _feedback.ForeColor = AppTheme.Muted;
@@ -90,7 +90,7 @@ internal sealed class SetupPage : FlowLayoutPanel
         _feedback.Visible = false;
         _check = new Button
         {
-            Name = "CheckSetup", Width = 390, Height = 48, FlatStyle = FlatStyle.Flat,
+            Name = "CheckSetup", Width = PopupLayout.ContentWidth, Height = 48, FlatStyle = FlatStyle.Flat,
             ForeColor = AppTheme.OnAccent, BackColor = AppTheme.Accent, Margin = Padding.Empty
         };
         _check.FlatAppearance.BorderSize = 0;
