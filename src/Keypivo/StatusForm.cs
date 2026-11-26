@@ -40,6 +40,8 @@ internal sealed class StatusForm : Form
 
     public StatusForm()
     {
+        // Defer the initial DPI pass until every child has its logical bounds.
+        SuspendLayout();
         Text = "Keypivo";
         Font = new Font("Segoe UI", 12);
         AutoScaleDimensions = new SizeF(96, 96);
@@ -64,7 +66,7 @@ internal sealed class StatusForm : Form
         {
             Name = "MenuHeader", ColumnCount = 2, RowCount = 1,
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Width = 438, MinimumSize = new Size(438, 0), Margin = Padding.Empty,
+            Width = PopupLayout.Width, MinimumSize = new Size(PopupLayout.Width, 0), Margin = Padding.Empty,
             Padding = new Padding(22, 12, 14, 12), BackColor = AppTheme.Chrome
         };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -92,20 +94,20 @@ internal sealed class StatusForm : Form
         var state = new FlowLayoutPanel
         {
             AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(438, 0), FlowDirection = FlowDirection.TopDown,
+            MinimumSize = new Size(PopupLayout.Width, 0), FlowDirection = FlowDirection.TopDown,
             WrapContents = false, Margin = Padding.Empty, Padding = new Padding(24, 32, 24, 32)
         };
         var title = new TableLayoutPanel
         {
-            Name = "DeviceTitle", Width = 390, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(390, 0), ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
+            Name = "DeviceTitle", Width = PopupLayout.ContentWidth, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(PopupLayout.ContentWidth, 0), ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
         };
         title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _deviceHeading = new Label
         {
             Name = "DeviceHeading", Text = "-", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
-            Width = 342, Height = 40, AutoEllipsis = true, UseMnemonic = false,
+            Width = PopupLayout.ContentWidth - 48, Height = 40, AutoEllipsis = true, UseMnemonic = false,
             TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
             Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
@@ -118,7 +120,7 @@ internal sealed class StatusForm : Form
         _toolTip.SetToolTip(_info, _info.AccessibleName);
         _status = new Label
         {
-            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(390, 0),
+            Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(PopupLayout.ContentWidth, 0),
             ForeColor = AppTheme.Muted, Margin = new Padding(0, 6, 0, 0)
         };
         state.Controls.Add(_status);
@@ -152,6 +154,7 @@ internal sealed class StatusForm : Form
         };
         VisibleChanged += (_, _) => { if (!Visible) TopMost = false; };
         SizeChanged += (_, _) => { if (Visible) Place(); };
+        ResumeLayout(true);
     }
 
     public void Render(DeviceSnapshot snapshot, bool busy, bool refreshing, string? error, Icon icon, bool unconfirmed = false)
@@ -313,7 +316,7 @@ internal sealed class StatusForm : Form
     {
         var button = new Button
         {
-            Text = text, Width = 422, Height = 56, Margin = new Padding(8, 0, 8, 0),
+            Text = text, Width = PopupLayout.Width - 16, Height = 56, Margin = new Padding(8, 0, 8, 0),
             FlatStyle = FlatStyle.Flat, TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(16, 0, 16, 0), TabStop = true,
             BackColor = AppTheme.Surface,
@@ -327,6 +330,6 @@ internal sealed class StatusForm : Form
 
     private static Panel Separator() => new()
     {
-        BackColor = AppTheme.Border, Height = 1, Width = 438, Margin = Padding.Empty
+        BackColor = AppTheme.Border, Height = 1, Width = PopupLayout.Width, Margin = Padding.Empty
     };
 }
