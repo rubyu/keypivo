@@ -16,6 +16,7 @@ internal static class SettingsRenderingTests
             form.Show();
             Application.DoEvents();
             var initialSize = form.Size;
+            Assert(Screen.FromControl(form).WorkingArea.Contains(form.Bounds), "The settings dialog must stay inside the working area");
             foreach (var category in new[] { "General", "Launch", "Connection", "Attention", "General", "Connection" })
             {
                 Find<Button>(form, "Settings" + category).PerformClick();
@@ -40,19 +41,38 @@ internal static class SettingsRenderingTests
                 var heading = Find<Label>(form, "NotificationsHeading");
                 Assert(heading.Width >= TextRenderer.MeasureText(heading.Text, heading.Font).Width,
                     "The Notifications heading must not wrap mid-word");
-                if (category == "Attention" && textScale > 1)
+                if (category == "Attention")
                 {
                     var last = rows.Last();
+                    if (textScale == 1 && page.ClientSize.Height >= page.AutoScrollMinSize.Height)
+                        Assert(last.Bottom + page.Padding.Bottom <= page.ClientSize.Height,
+                            "All attention settings must fit with bottom padding when the screen has room");
                     page.ScrollControlIntoView(last);
+                    Application.DoEvents();
                     Assert(last.Top >= 0 && last.Bottom <= page.ClientSize.Height,
                         "The last setting must remain reachable when text is enlarged");
+                    var footer = Find<TableLayoutPanel>(form, "SettingsFooter");
+                    Assert(page.PointToScreen(new Point(0, last.Bottom)).Y <= footer.PointToScreen(Point.Empty).Y,
+                        "The last switch must remain above the fixed footer");
                 }
             }
             Find<Button>(form, "SettingsAttention").PerformClick();
             Program.Capture(form, $"settings-text-{textScale * 100:0}");
             if (textScale == 1) Program.CaptureScreen(form, "settings-attention-screen");
+            // Exercise the constrained-height path as well as a roomy desktop.
+            form.ClientSize = new Size(form.ClientSize.Width, 420);
+            var attention = Find<FlowLayoutPanel>(form, "AttentionPage");
+            Application.DoEvents();
+            Assert(attention.VerticalScroll.Visible, "A short window must expose vertical scrolling");
+            attention.AutoScrollPosition = new Point(0, attention.DisplayRectangle.Height);
+            Application.DoEvents();
+            var lastSetting = Find<NotificationToggle>(form, "NotifySettingsCouldNotBeLoaded");
+            Assert(lastSetting.Top >= 0 && lastSetting.Bottom + attention.Padding.Bottom <= attention.ClientSize.Height,
+                "Scrolling to the bottom must expose the entire last setting and trailing padding");
+            Assert(!attention.HorizontalScroll.Visible, "A short window must not introduce horizontal scrolling");
+            Program.Capture(form, $"settings-short-{textScale * 100:0}");
         }
-        Console.WriteLine("PASS Settings rendering: opaque repaint, erased text, clipped paint, category navigation, and 100/150/200% text layout.");
+        Console.WriteLine("PASS Settings rendering: opaque repaint, category navigation, 100/150/200% text, and fully reachable bottom settings in short windows.");
     }
 
     private static void CheckOpaqueRepainting()

@@ -19,6 +19,8 @@ internal static class DeviceDetailsTests
         popup.Render(snapshot, false, false, null, icon);
         popup.ShowAt(DisplayPosition.Center);
         Application.DoEvents();
+        Assert(popup.Width >= (int)Math.Round(520 * popup.DeviceDpi / 96d),
+            "The enlarged popup must retain its logical width at the current display DPI");
         var info = Find<PopupButton>(popup, "ToggleDeviceDetails");
         var heading = Find<Label>(popup, "DeviceHeading");
         Assert(heading.Text == device.Description && !heading.UseMnemonic, "The heading must display the selected device description literally");
@@ -73,11 +75,18 @@ internal static class DeviceDetailsTests
         Program.CaptureScreen(popup, "details-disconnected");
         info.PerformClick();
         Assert(!panel.Expanded && info.AccessibleName == "Show all device details", "Info must return to compact mode");
-        foreach (var description in new[] { "", "  ", "Reader & authentication device" })
+        foreach (var description in new[] { "", "  ", "Reader & authentication device", "USB 入力デバイス, Microsoft Usbccid Smartcard Reader (WUDF)" })
         {
             popup.Render(DeviceSnapshot.FromDevices([device with { Description = description }]), false, false, null, icon);
             Assert(heading.Text == (string.IsNullOrWhiteSpace(description) ? "-" : description),
                 "Replacement and empty descriptions must update the heading");
+            if (description.StartsWith("USB 入力", StringComparison.Ordinal))
+            {
+                Application.DoEvents();
+                Assert(heading.Height >= heading.GetPreferredSize(new Size(heading.Width, 0)).Height,
+                    "The reported composite-device description must fit in the enlarged heading");
+                Program.CaptureScreen(popup, "details-composite-device");
+            }
         }
 
         var defaultFont = popup.Font;

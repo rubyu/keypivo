@@ -6,7 +6,7 @@ Store updates are submitted manually in [Partner Center](https://partner.microso
 
 1. Merge the release PR from `develop` into `main`.
 2. Wait for [CI](https://github.com/rubyu/keypivo/actions/workflows/ci.yml), including **Publish GitHub Release**, to succeed on that `main` commit.
-3. Open the new [GitHub Release](https://github.com/rubyu/keypivo/releases) and download `keypivo-<version>-x64.msix` from **Assets**. `SHA256SUMS.txt` provides its checksum; the release notes link to the source commit and CI run.
+3. Open the new [GitHub Release](https://github.com/rubyu/keypivo/releases) and download `keypivo-<version>-x64.msix` from **Assets**. `SHA256SUMS.txt` provides its checksum. The release tag identifies the source commit; build details are available in GitHub Actions.
 4. In Partner Center, open **Keypivo** and create an update submission. Upload the MSIX in **Packages**, with a version higher than the packages already published.
 5. Review the existing listing, availability, and [certification notes](store-listing.md#certification-notes), then submit the update for certification and choose when it should be published.
 
@@ -17,6 +17,8 @@ Microsoft Store signs the package. The unsigned MSIX is for Store submission, no
 The `CI` workflow runs on PRs targeting `develop` or `main`, pushes to those branches, and manual runs. It builds the solution, runs application and native UI tests, and creates and validates an x64 MSIX containing the .NET runtime. Test logs, UI previews, and the package are uploaded as artifacts. No USB device or Store credential is needed.
 
 Only successful pushes and manual runs on `main` publish a GitHub Release, tagged `v<package-version>`. The release job downloads the MSIX built in that same CI run, uploads it and its checksum to a draft, then publishes the completed release. PRs and `develop` runs never publish releases. Publishing uses the workflow's built-in GitHub token; no additional secret is needed.
+
+Public release notes contain the Microsoft Store install link and GitHub's generated list of changes since the previous release. Submission instructions remain in this document.
 
 Package versions follow `1.<run-number / 65536, rounded down>.<run-number modulo 65536>.0`. For ordinary run numbers this is `1.0.<run-number>.0`. A new workflow run advances the version; re-running an existing run preserves it. If you need another package, select **Run workflow** on `main` to start a new run.
 

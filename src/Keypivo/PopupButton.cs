@@ -30,7 +30,7 @@ internal sealed class PopupButton : Button
         UseVisualStyleBackColor = false;
         BackColor = glyph.HasValue ? AppTheme.Chrome : AppTheme.Surface;
         ForeColor = glyph.HasValue ? AppTheme.Muted : AppTheme.OnAccent;
-        Size = glyph.HasValue ? new Size(40, 40) : new Size(390, 48);
+        Size = glyph.HasValue ? new Size(40, 40) : new Size(PopupLayout.ContentWidth, 48);
         Margin = Padding.Empty;
         TabStop = true;
     }

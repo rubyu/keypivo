@@ -19,7 +19,7 @@ internal sealed class DeviceDetailsPanel : Panel
     internal DeviceDetailsPanel()
     {
         Name = "DeviceDetails";
-        Width = 438;
+        Width = PopupLayout.Width;
         Margin = new Padding(0, 24, 0, 0);
         BackColor = AppTheme.Chrome;
         AutoScroll = true;
