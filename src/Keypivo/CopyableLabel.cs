@@ -6,18 +6,15 @@ namespace Keypivo;
 internal sealed class CopyFeedback : IDisposable
 {
     private readonly ToolTip _toolTip = new() { UseAnimation = false, UseFading = false };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1500 };
     private readonly Action<string> _writeText;
     private Control? _owner;
     private bool _disposed;
 
-    internal CopyFeedback(Action<string>? writeText = null) => _writeText = writeText ?? Clipboard.SetText;
-
-    internal void SetHint(Control owner, bool hasValue)
+    internal CopyFeedback(Action<string>? writeText = null)
     {
-        if (_disposed) return;
-        // Associate the control before Show creates the native tooltip window.
-        // This gives it the popup owner, so it stays above the topmost tray menu.
-        _toolTip.SetToolTip(owner, hasValue ? "Click to copy" : null);
+        _writeText = writeText ?? Clipboard.SetText;
+        _timer.Tick += (_, _) => Hide();
     }
 
     internal void Copy(Control owner, string value)
@@ -27,13 +24,21 @@ internal sealed class CopyFeedback : IDisposable
         try { _writeText(value); }
         catch (ExternalException) { message = "Clipboard is busy. Try again."; }
         _owner = owner;
+        // Associate the control before Show creates the native tooltip window,
+        // giving it the popup owner so it stays above the topmost tray menu.
+        _toolTip.SetToolTip(owner, message);
         var inset = (int)Math.Round(8 * owner.DeviceDpi / 96d);
-        _toolTip.Show(message, owner, new Point(inset, owner.Height + inset), 1500);
+        _toolTip.Show(message, owner, new Point(inset, owner.Height + inset));
+        _timer.Start();
     }
 
     internal void Hide(Control? owner = null)
     {
         if (_disposed || _owner is null || (owner is not null && owner != _owner)) return;
+        _timer.Stop();
+        // Remove the association before Hide restores automatic hover tips.
+        // Copy feedback must neither linger nor reappear after its timeout.
+        _toolTip.RemoveAll();
         _toolTip.Hide(_owner);
         _owner = null;
     }
@@ -42,6 +47,7 @@ internal sealed class CopyFeedback : IDisposable
     {
         if (_disposed) return;
         Hide();
+        _timer.Dispose();
         _toolTip.Dispose();
         _disposed = true;
     }
@@ -65,7 +71,6 @@ internal sealed class CopyableLabel : Label
     {
         base.OnTextChanged(e);
         _feedback?.Hide(this);
-        _feedback?.SetHint(this, HasValue);
         TabStop = HasValue;
         Cursor = HasValue ? Cursors.Hand : Cursors.Default;
     }
@@ -111,11 +116,7 @@ internal sealed class CopyableLabel : Label
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
-        {
-            _feedback.Hide(this);
-            _feedback.SetHint(this, false);
-        }
+        if (disposing) _feedback.Hide(this);
         base.Dispose(disposing);
     }
 
