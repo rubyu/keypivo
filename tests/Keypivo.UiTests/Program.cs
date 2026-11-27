@@ -34,6 +34,7 @@ internal static class Program
             PopupPresentationTests.Run();
             PopupHeaderTests.Run();
             DeviceDetailsTests.Run();
+            CopyableValueTests.Run();
             PollingPresentationTests.Run();
             StartupSettingsTests.Run();
             NotificationSettingsTests.Run();

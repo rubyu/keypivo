@@ -16,7 +16,7 @@ internal sealed class DeviceDetailsPanel : Panel
 
     internal bool Expanded => _expanded;
 
-    internal DeviceDetailsPanel()
+    internal DeviceDetailsPanel(CopyFeedback copyFeedback)
     {
         Name = "DeviceDetails";
         Width = PopupLayout.Width;
@@ -27,7 +27,7 @@ internal sealed class DeviceDetailsPanel : Panel
         _rows = new[] { "Product", "Vendor", "Description", "Connection", "Sharing", "Bus ID", "Persisted GUID" }
             .Select(caption => (
                 new Label { Name = caption.Replace(" ", "") + "Caption", Text = caption + ":", ForeColor = AppTheme.Muted, UseMnemonic = false },
-                new Label { Name = caption.Replace(" ", "") + "Value", Text = "-", ForeColor = AppTheme.Text, UseMnemonic = false }))
+                (Label)new CopyableLabel(copyFeedback) { Name = caption.Replace(" ", "") + "Value", AccessibleName = caption, Text = "-", ForeColor = AppTheme.Text }))
             .ToArray();
         foreach (var row in _rows) Controls.AddRange([row.Caption, row.Value]);
         Controls.Add(_separator);

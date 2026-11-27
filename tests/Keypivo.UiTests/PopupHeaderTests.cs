@@ -15,15 +15,18 @@ internal static class PopupHeaderTests
         Application.DoEvents();
         var tools = Find<FlowLayoutPanel>(popup, "HeaderActions");
         var refresh = Find<Button>(popup, "RefreshStatus");
+        var info = Find<Button>(popup, "ToggleDeviceDetails");
         var settings = Find<Button>(popup, "OpenSettings");
         var exit = Find<Button>(popup, "ExitApplication");
         var action = Find<Button>(popup, "SwitchAction");
         var buttons = new[] { refresh, settings, exit };
-        Assert(buttons.All(button => button.Parent == tools && button.Text.Length == 0), "Utility actions must be icon buttons in the header");
-        Assert(buttons.Select(button => button.AccessibilityObject.Name).SequenceEqual(new[] { "Refresh status", "Settings", "Exit Keypivo" }),
+        var headerButtons = new[] { refresh, info, settings, exit };
+        Assert(tools.Controls.Cast<Control>().SequenceEqual(headerButtons), "Header order must be Refresh, device details, Settings, Exit");
+        Assert(headerButtons.All(button => button.Parent == tools && button.Text.Length == 0), "Utility actions must be icon buttons in the header");
+        Assert(headerButtons.Select(button => button.AccessibilityObject.Name).SequenceEqual(new[] { "Refresh status", "Show all device details", "Settings", "Exit Keypivo" }),
             "Icon-only buttons must expose meaningful accessible names");
         var tooltip = (ToolTip)typeof(StatusForm).GetField("_toolTip", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(popup)!;
-        Assert(buttons.All(button => tooltip.GetToolTip(button) == button.AccessibleName), "Each icon must have a descriptive tooltip");
+        Assert(headerButtons.All(button => tooltip.GetToolTip(button) == button.AccessibleName), "Each icon must have a descriptive tooltip");
         var calls = new int[3];
         popup.RefreshRequested += () => calls[0]++;
         popup.SettingsRequested += () => calls[1]++;
@@ -40,11 +43,10 @@ internal static class PopupHeaderTests
         Assert(buttons.All(button => button.Enabled), "Completing work must restore header actions");
 
         refresh.Focus();
-        Assert(popup.SelectNextControl(refresh, true, true, true, true) && settings.Focused, "Keyboard navigation must reach Settings after Refresh");
+        Assert(popup.SelectNextControl(refresh, true, true, true, true) && info.Focused, "Keyboard navigation must reach device details after Refresh");
+        Assert(popup.SelectNextControl(info, true, true, true, true) && settings.Focused, "Keyboard navigation must reach Settings after device details");
         Assert(popup.SelectNextControl(settings, true, true, true, true) && exit.Focused, "Keyboard navigation must reach Exit after Settings");
-        var info = Find<Button>(popup, "ToggleDeviceDetails");
-        Assert(popup.SelectNextControl(exit, true, true, true, true) && info.Focused, "Keyboard navigation must reach device information after the header");
-        Assert(popup.SelectNextControl(info, true, true, true, true) && action.Focused, "Keyboard navigation must reach the primary action after device information");
+        Assert(popup.SelectNextControl(exit, true, true, true, true) && action.Focused, "Keyboard navigation must skip the empty heading and reach the primary action after the header");
 
         var defaultFont = popup.Font;
         foreach (var textScale in new[] { 1f, 1.5f, 2f })
@@ -56,9 +58,10 @@ internal static class PopupHeaderTests
                 popup.Render(current, false, false, null, SystemIcons.Application);
                 Application.DoEvents();
                 Program.CheckBounds(popup);
-                Assert(refresh.Size == settings.Size && settings.Size == exit.Size && refresh.Top == settings.Top && settings.Top == exit.Top,
+                Assert(headerButtons.All(button => button.Size == refresh.Size && button.Top == refresh.Top),
                     "Header buttons must keep equal sizes and vertical alignment");
-                Assert(settings.Left - refresh.Right == exit.Left - settings.Right, "All three header buttons must have equal gaps");
+                Assert(headerButtons.Zip(headerButtons.Skip(1), (left, right) => right.Left - left.Right).Distinct().Count() == 1,
+                    "All four header buttons must have equal gaps");
                 var measured = TextRenderer.MeasureText(action.Text, action.Font);
                 Assert(measured.Width <= action.Width - 24 && measured.Height <= action.Height,
                     "The primary action must remain readable with enlarged text");
