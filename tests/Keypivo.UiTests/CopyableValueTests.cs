@@ -33,8 +33,12 @@ internal static class CopyableValueTests
 
         foreach (var value in new[] { heading, product, guid }) CheckCopy(value);
         CheckCopy(heading);
+        // Allow the native tooltip's fade-in to finish before checking pixels.
+        Thread.Sleep(250);
+        Application.DoEvents();
         Assert(VisibleTooltips() > 0, "Copying must show a native tooltip");
         Program.CaptureScreen(popup, "device-value-copied");
+        Assert(TooltipAbove(popup), "Copy feedback must be above the topmost tray popup");
         popup.Hide();
         Application.DoEvents();
         Assert(VisibleTooltips() == 0, "Hiding the popup must dismiss copy feedback");
@@ -125,6 +129,17 @@ internal static class CopyableValueTests
         return count;
     }
 
+    private static bool TooltipAbove(Form popup)
+    {
+        for (var window = GetWindow(popup.Handle, 3); window != IntPtr.Zero; window = GetWindow(window, 3))
+        {
+            var name = new StringBuilder(256);
+            GetClassName(window, name, name.Capacity);
+            if (name.ToString().Contains("tooltips_class32", StringComparison.Ordinal) && IsWindowVisible(window)) return true;
+        }
+        return false;
+    }
+
     private static T Find<T>(Control parent, string name) where T : Control => parent.Controls.Find(name, true).OfType<T>().Single();
     private static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     private delegate bool EnumWindowProc(IntPtr window, IntPtr parameter);
@@ -132,4 +147,5 @@ internal static class CopyableValueTests
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int count);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
 }
