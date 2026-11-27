@@ -219,6 +219,7 @@ var tests = new (string Name, Func<Task> Run)[]
         Equal(128 * 1024, result.StandardOutput.Length);
         Equal(128 * 1024, result.StandardError.Length);
     }),
+    ("Process: streams are released before GC on success, timeout and cancellation", ProcessResourceTests.RunAsync),
     ("Process: timeout and explicit cancellation terminate the wait", async () =>
     {
         var runner = new ProcessCommandRunner();
