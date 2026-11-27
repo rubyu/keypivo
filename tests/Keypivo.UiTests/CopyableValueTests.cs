@@ -35,7 +35,7 @@ internal static class CopyableValueTests
 
         foreach (var value in new[] { heading, product, guid }) CheckCopy(value);
         CheckCopy(heading);
-        // Allow the native tooltip's fade-in to finish before checking pixels.
+        // Let the native tooltip finish painting before capturing its pixels.
         Thread.Sleep(250);
         Application.DoEvents();
         Assert(VisibleTooltips() > 0, "Copying must show a native tooltip");

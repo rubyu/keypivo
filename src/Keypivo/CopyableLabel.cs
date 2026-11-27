@@ -5,7 +5,7 @@ namespace Keypivo;
 // One tooltip per popup, shared by the heading and all property values.
 internal sealed class CopyFeedback : IDisposable
 {
-    private readonly ToolTip _toolTip = new();
+    private readonly ToolTip _toolTip = new() { UseAnimation = false, UseFading = false };
     private readonly Action<string> _writeText;
     private Control? _owner;
     private bool _disposed;
