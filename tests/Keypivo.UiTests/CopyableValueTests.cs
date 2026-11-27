@@ -9,6 +9,7 @@ internal static class CopyableValueTests
 {
     public static void Run()
     {
+        using var icons = new TrayIcons();
         using var popup = new StatusForm { AllowClose = true, KeepOpen = true };
         var device = new UsbDevice
         {
@@ -17,7 +18,8 @@ internal static class CopyableValueTests
             Description = "USB 入力デバイス, Microsoft Usbccid Smartcard Reader (WUDF) & authentication"
         };
         var snapshot = DeviceSnapshot.FromDevices([device]);
-        popup.Render(snapshot, false, false, null, SystemIcons.Application);
+        var icon = icons.For(snapshot.State);
+        popup.Render(snapshot, false, false, null, icon);
         popup.ShowAt(DisplayPosition.Center);
         Application.DoEvents();
         var heading = Find<CopyableLabel>(popup, "DeviceHeading");
@@ -65,7 +67,7 @@ internal static class CopyableValueTests
 
         var longDescription = string.Join(" ", Enumerable.Repeat(device.Description, 30));
         popup.Render(DeviceSnapshot.FromDevices([device with { Description = longDescription, ClientIPAddress = "172.22.0.2" }]),
-            false, false, null, SystemIcons.Application);
+            false, false, null, icon);
         Application.DoEvents();
         CheckCopy(heading);
         Assert(Clipboard.GetText() == longDescription, "An ellipsized heading must copy the full Unicode description");
@@ -74,7 +76,7 @@ internal static class CopyableValueTests
         CheckCopy(connection);
         Assert(Clipboard.GetText() == "WSL", "Copy must use the current value after a status update");
 
-        popup.Render(DeviceSnapshot.FromDevices([]), false, false, null, SystemIcons.Application);
+        popup.Render(DeviceSnapshot.FromDevices([]), false, false, null, icon);
         Application.DoEvents();
         Assert(VisibleTooltips() == 0, "Updating the copied value must dismiss stale feedback");
         Clipboard.SetText("preserved");
