@@ -59,7 +59,7 @@ internal sealed class PopupButton : Button
         Color fill;
         if (_glyph.HasValue)
         {
-            fill = active ? AppTheme.Hover : BackColor;
+            fill = active ? AppTheme.IconHover : AppTheme.IconSurface;
             if (active) foreground = AppTheme.Text;
             if (Selected)
             {
