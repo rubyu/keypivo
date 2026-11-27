@@ -143,7 +143,14 @@ internal sealed class StatusForm : Form
             TopMost = false;
             if (!KeepOpen && !IsSetupVisible) Hide();
         };
-        VisibleChanged += (_, _) => { if (!Visible) TopMost = false; };
+        VisibleChanged += (_, _) =>
+        {
+            if (!Visible)
+            {
+                TopMost = false;
+                _copyFeedback.Hide();
+            }
+        };
         SizeChanged += (_, _) => { if (Visible) Place(); };
         ResumeLayout(true);
     }

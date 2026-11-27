@@ -43,6 +43,7 @@ internal static class CopyableValueTests
         Assert(TooltipAbove(popup), "Copy feedback must be above the topmost tray popup");
         popup.Hide();
         Application.DoEvents();
+        Program.CaptureScreen(popup, "copy-feedback-dismissed");
         Assert(VisibleTooltips() == 0, "Hiding the popup must dismiss copy feedback");
         popup.ShowAt(DisplayPosition.Center);
         CheckCopy(heading);
@@ -129,7 +130,13 @@ internal static class CopyableValueTests
             // WinForms registers a versioned wrapper around the native class.
             var className = name.ToString();
             if ((className == "tooltips_class32" || className.Contains(".tooltips_class32.", StringComparison.Ordinal))
-                && IsWindowVisible(window)) count++;
+                && IsWindowVisible(window))
+            {
+                var text = new StringBuilder(1024);
+                GetWindowText(window, text, text.Capacity);
+                Console.WriteLine($"VISIBLE TOOLTIP: {className}: {text}");
+                count++;
+            }
             return true;
         }, IntPtr.Zero);
         return count;
@@ -152,6 +159,7 @@ internal static class CopyableValueTests
     [DllImport("user32.dll")] private static extern bool EnumThreadWindows(uint threadId, EnumWindowProc callback, IntPtr parameter);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
 }
