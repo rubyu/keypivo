@@ -116,7 +116,10 @@ internal static class CopyableValueTests
         {
             var name = new StringBuilder(256);
             GetClassName(window, name, name.Capacity);
-            if (name.ToString() == "tooltips_class32" && IsWindowVisible(window)) count++;
+            // WinForms registers a versioned wrapper around the native class.
+            var className = name.ToString();
+            if ((className == "tooltips_class32" || className.Contains(".tooltips_class32.", StringComparison.Ordinal))
+                && IsWindowVisible(window)) count++;
             return true;
         }, IntPtr.Zero);
         return count;
