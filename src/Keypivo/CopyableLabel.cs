@@ -27,6 +27,7 @@ internal sealed class CopyFeedback : IDisposable
         // Associate the control before Show creates the native tooltip window,
         // giving it the popup owner so it stays above the topmost tray menu.
         _toolTip.SetToolTip(owner, message);
+        _toolTip.Active = true;
         var inset = (int)Math.Round(8 * owner.DeviceDpi / 96d);
         _toolTip.Show(message, owner, new Point(inset, owner.Height + inset));
         _timer.Start();
@@ -36,6 +37,7 @@ internal sealed class CopyFeedback : IDisposable
     {
         if (_disposed || _owner is null || (owner is not null && owner != _owner)) return;
         _timer.Stop();
+        _toolTip.Active = false;
         // Remove the association before Hide restores automatic hover tips.
         // Copy feedback must neither linger nor reappear after its timeout.
         _toolTip.RemoveAll();

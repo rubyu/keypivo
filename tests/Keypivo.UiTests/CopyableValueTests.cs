@@ -45,6 +45,10 @@ internal static class CopyableValueTests
         Application.DoEvents();
         Assert(VisibleTooltips() == 0, "Hiding the popup must dismiss copy feedback");
         popup.ShowAt(DisplayPosition.Center);
+        CheckCopy(heading);
+        Thread.Sleep(1700);
+        Application.DoEvents();
+        Assert(VisibleTooltips() == 0, "Copy feedback must expire and remove its hover association");
 
         info.PerformClick();
         Application.DoEvents();
