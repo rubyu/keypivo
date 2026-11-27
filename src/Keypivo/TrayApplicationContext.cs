@@ -23,8 +23,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private Exception? _lastError;
     private ManualSetup? _setup;
     private SetupCheckResult _setupResult = new(false, false, null);
-    private bool _setupChecked;
-    private bool _checkingSetup;
     private string? _setupMessage;
     private (ConnectionState State, string? InstanceId, string? BusId)? _lastNotification;
 
@@ -42,13 +40,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
         _tray.BalloonTipClicked += (_, _) => ShowStatusFromTray();
         _form.SwitchRequested += async () => await RunActionAsync(SwitchAction.Toggle);
-        _form.RefreshRequested += async () => await RefreshAsync(clearError: true);
         _form.SettingsRequested += async () => await ShowSettingsAsync();
         _form.ExitRequested += () => ExitThread();
         _form.DetailsRequested += ShowDetails;
         _form.SetupBackRequested += () => { CloseSetup(); Render(); ShowStatus(); };
-        _form.SetupCopyRequested += async () => await CheckSetupAsync(copy: true);
-        _form.SetupCheckRequested += async () => await CheckSetupAsync(copy: false);
+        _form.SetupCopyRequested += async () => await CopySetupCommandAsync();
         _controller.SnapshotChanged += OnSnapshot;
         _controller.VerificationRecovered += OnVerificationRecovered;
         _timer.Tick += async (_, _) => await RefreshAsync();
@@ -82,41 +78,38 @@ internal sealed class TrayApplicationContext : ApplicationContext
         if (!_closing && !_editingSettings) _form.ShowAt(_settings.Position);
     }
 
-    internal async Task RefreshAsync(bool clearError = false)
+    internal async Task RefreshAsync()
     {
-        if (_busy || _refreshing || _editingSettings || _closing || (!clearError && _backgroundRefresh is not null)) return;
-        TaskCompletionSource? completion = null;
-        if (clearError)
+        if (_busy || _refreshing || _editingSettings || _closing) return;
+        if (_backgroundRefresh is { } pending)
         {
-            _refreshing = true;
-            _lastError = null;
-            Render();
+            await pending.Task;
+            return;
         }
-        else
-        {
-            // Automatic reads are invisible to the UI. Explicit actions wait for
-            // this read instead of being dropped while their buttons look enabled.
-            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            _backgroundRefresh = completion;
-        }
+        // Automatic reads are invisible to the UI. Explicit actions wait for
+        // this read instead of being dropped while their buttons look enabled.
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _backgroundRefresh = completion;
         try
         {
-            if (clearError) await WaitForBackgroundRefreshAsync();
             if (_closing) return;
             if (_setup is { } setup)
             {
                 var result = await _controller.CheckSetupAsync(setup, _lifetime.Token);
                 // Back remains usable while a background read is in flight.
-                if (ReferenceEquals(_setup, setup)) _setupResult = result;
+                if (ReferenceEquals(_setup, setup))
+                {
+                    _setupResult = result;
+                    _setupMessage = null;
+                }
             }
             else await _controller.RefreshAsync(_lifetime.Token);
         }
         catch (OperationCanceledException) when (_closing) { }
         finally
         {
-            if (clearError) _refreshing = false;
-            else _backgroundRefresh = null;
-            completion?.TrySetResult();
+            _backgroundRefresh = null;
+            completion.TrySetResult();
             if (!_closing) Render();
         }
     }
@@ -161,7 +154,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _lastError = null;
         _setup = setup;
-        _setupChecked = false;
         _setupMessage = null;
         _setupResult = setup.Inspect(_controller.Current);
         _form.ShowSetup(setup);
@@ -173,19 +165,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         _setup = null;
         _setupMessage = null;
-        _setupChecked = false;
         _form.ShowMenu();
     }
 
-    private async Task CheckSetupAsync(bool copy)
+    private async Task CopySetupCommandAsync()
     {
         if (_setup is not { } setup || _busy || _refreshing || _editingSettings || _closing) return;
         _refreshing = true;
-        _checkingSetup = !copy;
         _setupMessage = null;
-        if (!copy) _setupChecked = true;
         Render();
-        var completed = false;
         try
         {
             await WaitForBackgroundRefreshAsync();
@@ -193,27 +181,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
             // Never copy a command for a stale bus ID or a replacement device.
             _setupResult = await _controller.CheckSetupAsync(setup, _lifetime.Token);
             if (_closing) return;
-            if (copy && _setupResult.CanCopy)
+            if (_setupResult.CanCopy && !_setupResult.IsComplete)
             {
                 Clipboard.SetText(setup.Command);
                 _form.MarkCommandCopied();
             }
-            else if (!copy && _setupResult.IsComplete)
-            {
-                CloseSetup();
-                completed = true;
-            }
         }
         catch (OperationCanceledException) when (_closing) { }
         catch (ExternalException) { _setupMessage = "Clipboard is busy. Try copying again."; }
-        catch (Exception) { _setupMessage = "The state could not be checked. Try again."; }
+        catch (Exception) { _setupMessage = "Unable to read device status. Retrying automatically."; }
         finally
         {
-            _refreshing = _checkingSetup = false;
+            _refreshing = false;
             if (!_closing)
             {
                 Render();
-                if (completed) ShowStatus();
             }
         }
     }
@@ -326,9 +308,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             unconfirmed: _lastError is SwitchVerificationTimeoutException);
         if (_setup is not null)
         {
-            var feedback = !_setupResult.CanCopy || (_setupChecked && !_setupResult.IsComplete)
-                ? _setupResult.Message : _setupMessage;
-            _form.RenderSetup(_setupResult, feedback, _busy || _refreshing, _checkingSetup);
+            _form.RenderSetup(_setupResult, _setupMessage, _busy || _refreshing);
         }
     }
 

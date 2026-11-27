@@ -12,7 +12,6 @@ internal sealed class StatusForm : Form
     private readonly Label _status;
     private readonly Label _deviceHeading;
     private readonly Button _switch = new PopupButton { Text = "Switch to WSL", Margin = new Padding(24, 0, 24, 0) };
-    private readonly Button _refresh = new PopupButton(PopupGlyph.Refresh) { Name = "RefreshStatus", AccessibleName = "Refresh status", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _settings = new PopupButton(PopupGlyph.Settings) { Name = "OpenSettings", AccessibleName = "Settings", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _exit = new PopupButton(PopupGlyph.Power) { Name = "ExitApplication", AccessibleName = "Exit Keypivo" };
     private readonly ToolTip _toolTip = new();
@@ -30,13 +29,11 @@ internal sealed class StatusForm : Form
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool KeepOpen { get; set; }
     public event Action? SwitchRequested;
-    public event Action? RefreshRequested;
     public event Action? SettingsRequested;
     public event Action? ExitRequested;
     public event Action? DetailsRequested;
     public event Action? SetupBackRequested;
     public event Action? SetupCopyRequested;
-    public event Action? SetupCheckRequested;
     internal bool IsSetupVisible => _setupPage.Visible;
 
     public StatusForm()
@@ -89,7 +86,7 @@ internal sealed class StatusForm : Form
             Name = "HeaderActions", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             WrapContents = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty
         };
-        tools.Controls.AddRange([_refresh, _info, _settings, _exit]);
+        tools.Controls.AddRange([_info, _settings, _exit]);
         foreach (Control button in tools.Controls) _toolTip.SetToolTip(button, button.AccessibleName);
         header.Controls.Add(brand, 0, 0);
         header.Controls.Add(tools, 1, 0);
@@ -123,7 +120,6 @@ internal sealed class StatusForm : Form
         Controls.AddRange([_layout, _setupPage]);
 
         _switch.Click += (_, _) => SwitchRequested?.Invoke();
-        _refresh.Click += (_, _) => RefreshRequested?.Invoke();
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
         _exit.Click += (_, _) => ExitRequested?.Invoke();
         _details.Click += (_, _) => DetailsRequested?.Invoke();
@@ -136,7 +132,6 @@ internal sealed class StatusForm : Form
         };
         _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
         _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
-        _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
         Deactivate += (_, _) =>
         {
             // Instructions may stay open behind PowerShell, but must not remain above it.
@@ -169,7 +164,6 @@ internal sealed class StatusForm : Form
             : snapshot.Device?.IsAttached == true ? "Switch to Windows"
             : snapshot.Device is { IsShared: false } ? "Set up for WSL…" : "Switch to WSL";
         _switch.Enabled = !busy && !refreshing && (snapshot.CanOperate || snapshot.State == ConnectionState.ToolMissing);
-        _refresh.Enabled = !busy && !refreshing;
         _settings.Enabled = !busy && !refreshing;
         _exit.Enabled = !busy;
         _details.Visible = snapshot.State != ConnectionState.ToolMissing && !string.IsNullOrEmpty(error ?? snapshot.Error);
@@ -206,9 +200,9 @@ internal sealed class StatusForm : Form
         if (Visible) { Place(); _switch.Focus(); }
     }
 
-    public void RenderSetup(SetupCheckResult result, string? feedback, bool busy, bool checking)
+    public void RenderSetup(SetupCheckResult result, string? feedback, bool busy)
     {
-        if (!_setupPage.Render(result, feedback, busy, checking)) return;
+        if (!_setupPage.Render(result, feedback, busy)) return;
         PerformLayout();
         if (Visible) Place();
     }
@@ -227,7 +221,7 @@ internal sealed class StatusForm : Form
         BringToFront();
         Activate();
         if (IsSetupVisible) _setupPage.FocusPrimary();
-        else if (!_switch.Focus()) _refresh.Focus();
+        else if (!_switch.Focus()) _info.Focus();
     }
 
     private void Place()

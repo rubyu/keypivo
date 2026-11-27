@@ -8,7 +8,6 @@ internal static class AppTheme
     public static Color Muted => SystemInformation.HighContrast ? SystemColors.WindowText : Color.FromArgb(104, 113, 108);
     public static Color Border => SystemInformation.HighContrast ? SystemColors.WindowText : Color.FromArgb(232, 236, 233);
     public static Color Hover => SystemInformation.HighContrast ? SystemColors.Control : Color.FromArgb(244, 246, 244);
-    public static Color IconSurface => SystemInformation.HighContrast ? SystemColors.Control : Color.FromArgb(232, 237, 233);
     public static Color IconHover => SystemInformation.HighContrast ? SystemColors.ControlLight : Color.FromArgb(221, 229, 224);
     public static Color AccentSurface => SystemInformation.HighContrast ? SystemColors.Control : Color.FromArgb(234, 244, 239);
     public static Color AccentHover => SystemInformation.HighContrast ? SystemColors.ControlLight : Color.FromArgb(217, 234, 225);

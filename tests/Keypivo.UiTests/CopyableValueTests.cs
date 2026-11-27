@@ -29,7 +29,6 @@ internal static class CopyableValueTests
         var guid = Find<CopyableLabel>(popup, "PersistedGUIDValue");
         var commands = 0;
         popup.SwitchRequested += () => commands++;
-        popup.RefreshRequested += () => commands++;
         popup.SettingsRequested += () => commands++;
         popup.ExitRequested += () => commands++;
 

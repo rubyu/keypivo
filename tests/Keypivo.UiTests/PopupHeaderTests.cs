@@ -14,36 +14,34 @@ internal static class PopupHeaderTests
         popup.ShowAt(DisplayPosition.Center);
         Application.DoEvents();
         var tools = Find<FlowLayoutPanel>(popup, "HeaderActions");
-        var refresh = Find<Button>(popup, "RefreshStatus");
+        Assert(popup.Controls.Find("RefreshStatus", true).Length == 0, "The menu must not expose a refresh action");
         var info = Find<Button>(popup, "ToggleDeviceDetails");
         var settings = Find<Button>(popup, "OpenSettings");
         var exit = Find<Button>(popup, "ExitApplication");
         var action = Find<Button>(popup, "SwitchAction");
-        var buttons = new[] { refresh, settings, exit };
-        var headerButtons = new[] { refresh, info, settings, exit };
-        Assert(tools.Controls.Cast<Control>().SequenceEqual(headerButtons), "Header order must be Refresh, device details, Settings, Exit");
+        var buttons = new[] { settings, exit };
+        var headerButtons = new[] { info, settings, exit };
+        Assert(tools.Controls.Cast<Control>().SequenceEqual(headerButtons), "Header order must be device details, Settings, Exit");
         Assert(headerButtons.All(button => button.Parent == tools && button.Text.Length == 0), "Utility actions must be icon buttons in the header");
-        Assert(headerButtons.Select(button => button.AccessibilityObject.Name).SequenceEqual(new[] { "Refresh status", "Show all device details", "Settings", "Exit Keypivo" }),
+        Assert(headerButtons.Select(button => button.AccessibilityObject.Name).SequenceEqual(new[] { "Show all device details", "Settings", "Exit Keypivo" }),
             "Icon-only buttons must expose meaningful accessible names");
         var tooltip = (ToolTip)typeof(StatusForm).GetField("_toolTip", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(popup)!;
         Assert(headerButtons.All(button => tooltip.GetToolTip(button) == button.AccessibleName), "Each icon must have a descriptive tooltip");
-        var calls = new int[3];
-        popup.RefreshRequested += () => calls[0]++;
-        popup.SettingsRequested += () => calls[1]++;
-        popup.ExitRequested += () => calls[2]++;
+        var calls = new int[2];
+        popup.SettingsRequested += () => calls[0]++;
+        popup.ExitRequested += () => calls[1]++;
         foreach (var button in buttons) button.PerformClick();
-        Assert(calls.SequenceEqual(new[] { 1, 1, 1 }), "Each icon must invoke only its own action");
+        Assert(calls.SequenceEqual(new[] { 1, 1 }), "Each icon must invoke only its own action");
 
         popup.Render(snapshot, true, false, null, SystemIcons.Application);
         foreach (var button in buttons) button.PerformClick();
-        Assert(buttons.All(button => !button.Enabled) && calls.SequenceEqual(new[] { 1, 1, 1 }), "Switching must prevent header actions");
+        Assert(buttons.All(button => !button.Enabled) && calls.SequenceEqual(new[] { 1, 1 }), "Switching must prevent header actions");
         popup.Render(snapshot, false, true, null, SystemIcons.Application);
-        Assert(!refresh.Enabled && !settings.Enabled && exit.Enabled, "Refresh must keep Exit available while preventing overlapping reads");
+        Assert(!settings.Enabled && exit.Enabled, "Foreground checks must keep Exit available while preventing overlapping work");
         popup.Render(snapshot, false, false, null, SystemIcons.Application);
         Assert(buttons.All(button => button.Enabled), "Completing work must restore header actions");
 
-        refresh.Focus();
-        Assert(popup.SelectNextControl(refresh, true, true, true, true) && info.Focused, "Keyboard navigation must reach device details after Refresh");
+        info.Focus();
         Assert(popup.SelectNextControl(info, true, true, true, true) && settings.Focused, "Keyboard navigation must reach Settings after device details");
         Assert(popup.SelectNextControl(settings, true, true, true, true) && exit.Focused, "Keyboard navigation must reach Exit after Settings");
         Assert(popup.SelectNextControl(exit, true, true, true, true) && action.Focused, "Keyboard navigation must skip the empty heading and reach the primary action after the header");
@@ -58,10 +56,10 @@ internal static class PopupHeaderTests
                 popup.Render(current, false, false, null, SystemIcons.Application);
                 Application.DoEvents();
                 Program.CheckBounds(popup);
-                Assert(headerButtons.All(button => button.Size == refresh.Size && button.Top == refresh.Top),
+                Assert(headerButtons.All(button => button.Size == info.Size && button.Top == info.Top),
                     "Header buttons must keep equal sizes and vertical alignment");
                 Assert(headerButtons.Zip(headerButtons.Skip(1), (left, right) => right.Left - left.Right).Distinct().Count() == 1,
-                    "All four header buttons must have equal gaps");
+                    "All three header buttons must have equal gaps");
                 var measured = TextRenderer.MeasureText(action.Text, action.Font);
                 Assert(measured.Width <= action.Width - 24 && measured.Height <= action.Height,
                     "The primary action must remain readable with enlarged text");
@@ -76,7 +74,7 @@ internal static class PopupHeaderTests
     private static void CheckPaintCoverage()
     {
         var paint = typeof(PopupButton).GetMethod("OnPaint", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        foreach (var glyph in new PopupGlyph?[] { PopupGlyph.Refresh, PopupGlyph.Settings, PopupGlyph.Power, PopupGlyph.Info, null })
+        foreach (var glyph in new PopupGlyph?[] { PopupGlyph.Back, PopupGlyph.Settings, PopupGlyph.Power, PopupGlyph.Info, null })
         {
             using var button = new PopupButton(glyph) { Text = glyph.HasValue ? "" : "Switch to Windows" };
             using var bitmap = new Bitmap(button.Width, button.Height);

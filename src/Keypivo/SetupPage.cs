@@ -13,17 +13,17 @@ internal sealed class SetupPage : FlowLayoutPanel
     private readonly Label _subtitle;
     private readonly Label _commandLabel;
     private readonly Label _command;
+    private readonly FlowLayoutPanel _commandBox;
     private readonly Button _copy;
     private readonly LinkLabel _help;
     private readonly Label _feedback;
-    private readonly Button _check;
+    private readonly Button _done;
     private ManualSetup? _setup;
-    private bool _canCopy;
-    private (bool CanCopy, string? Feedback, bool Busy, bool Checking)? _lastPresentation;
+    private bool _complete;
+    private (bool Complete, bool CanCopy, string? Feedback, bool Busy)? _lastPresentation;
 
     public event Action? BackRequested;
     public event Action? CopyRequested;
-    public event Action? CheckRequested;
 
     public SetupPage()
     {
@@ -38,12 +38,10 @@ internal sealed class SetupPage : FlowLayoutPanel
 
         var header = Column(PopupLayout.Width, new Padding(20, 20, 20, 4));
         header.FlowDirection = FlowDirection.LeftToRight;
-        _back = new Button
+        _back = new PopupButton(PopupGlyph.Back)
         {
-            Name = "SetupBack", Text = "←", AccessibleName = "Back to menu", Width = 36, Height = 36,
-            FlatStyle = FlatStyle.Flat, ForeColor = AppTheme.Muted, BackColor = AppTheme.Surface, Margin = Padding.Empty
+            Name = "SetupBack", AccessibleName = "Back to menu", BackColor = AppTheme.Surface
         };
-        _back.FlatAppearance.BorderSize = 0;
         header.Controls.Add(_back);
         header.Controls.Add(new Label { Text = "Keypivo", AutoSize = true, Font = new Font("Segoe UI", 13, FontStyle.Bold), Margin = new Padding(10, 6, 0, 0) });
         Controls.Add(header);
@@ -57,54 +55,49 @@ internal sealed class SetupPage : FlowLayoutPanel
         _subtitle.Margin = new Padding(0, 0, 0, 27);
         _commandLabel = TextLabel(PopupLayout.ContentWidth);
         _commandLabel.Margin = new Padding(0, 0, 0, 12);
-        var commandBox = Column(PopupLayout.ContentWidth, new Padding(12));
-        commandBox.Name = "CommandBox";
-        commandBox.BackColor = AppTheme.Hover;
-        commandBox.Margin = new Padding(0, 0, 0, 7);
-        commandBox.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, commandBox.ClientRectangle, AppTheme.Border, ButtonBorderStyle.Solid);
+        _commandBox = Column(PopupLayout.ContentWidth, new Padding(12));
+        _commandBox.Name = "CommandBox";
+        _commandBox.BackColor = AppTheme.Hover;
+        _commandBox.Margin = new Padding(0, 0, 0, 12);
+        _commandBox.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, _commandBox.ClientRectangle, AppTheme.Border, ButtonBorderStyle.Solid);
         _command = TextLabel(PopupLayout.ContentWidth - 24, new Font("Consolas", 10.5f));
         _command.Name = "SetupCommand";
         _command.AccessibleName = "Command to run manually";
         _command.TextAlign = ContentAlignment.MiddleLeft;
-        commandBox.Controls.Add(_command);
-        _copy = new Button
+        _commandBox.Controls.Add(_command);
+        _copy = new PopupButton
         {
-            Name = "CopyCommand", Text = "Copy command", AccessibleName = "Copy command", Width = PopupLayout.ContentWidth, Height = 44,
-            FlatStyle = FlatStyle.Flat, ForeColor = AppTheme.Accent, BackColor = AppTheme.Surface,
-            Margin = new Padding(0, 0, 0, 20)
+            Name = "CopyCommand", Text = "Copy command", AccessibleName = "Copy command"
         };
-        _copy.FlatAppearance.BorderSize = 0;
-        _copy.FlatAppearance.MouseOverBackColor = AppTheme.Hover;
         _help = new LinkLabel
         {
             Name = "InstallationHelp", Text = "Other installation options", AccessibleName = "Other installation options (opens Microsoft Learn)",
             Width = PopupLayout.ContentWidth, Height = 30, TextAlign = ContentAlignment.MiddleCenter,
             LinkColor = AppTheme.Muted, ActiveLinkColor = AppTheme.Accent, VisitedLinkColor = AppTheme.Muted,
-            LinkBehavior = LinkBehavior.HoverUnderline, Margin = new Padding(0, 0, 0, 20)
+            LinkBehavior = LinkBehavior.HoverUnderline, Margin = new Padding(0, 17, 0, 0)
         };
         _feedback = TextLabel(PopupLayout.ContentWidth);
         _feedback.Name = "SetupFeedback";
         _feedback.TextAlign = ContentAlignment.MiddleLeft;
         _feedback.ForeColor = AppTheme.Muted;
-        _feedback.Margin = new Padding(0, 0, 0, 18);
+        _feedback.Margin = new Padding(0, 24, 0, 0);
         _feedback.Visible = false;
-        _check = new Button
+        _done = new PopupButton
         {
-            Name = "CheckSetup", Width = PopupLayout.ContentWidth, Height = 48, FlatStyle = FlatStyle.Flat,
-            ForeColor = AppTheme.OnAccent, BackColor = AppTheme.Accent, Margin = Padding.Empty
+            Name = "SetupDone", Text = "Done", AccessibleName = "Done", Visible = false
         };
-        _check.FlatAppearance.BorderSize = 0;
-        content.Controls.AddRange([_symbol, _title, _subtitle, _commandLabel, commandBox, _copy, _help, _feedback, _check]);
+        content.Controls.AddRange([_symbol, _title, _subtitle, _commandLabel, _commandBox, _copy, _help, _feedback, _done]);
         Controls.Add(content);
         _back.Click += (_, _) => BackRequested?.Invoke();
         _copy.Click += (_, _) => CopyRequested?.Invoke();
-        _check.Click += (_, _) => CheckRequested?.Invoke();
+        _done.Click += (_, _) => { if (_complete) BackRequested?.Invoke(); };
         _help.LinkClicked += (_, _) => OpenHelp();
     }
 
     public void SetInstructions(ManualSetup setup)
     {
         _setup = setup;
+        _complete = false;
         _lastPresentation = null;
         SuspendLayout();
         _title.Text = setup.Title;
@@ -112,6 +105,8 @@ internal sealed class SetupPage : FlowLayoutPanel
         _commandLabel.Text = setup.CommandLabel;
         _command.Text = setup.Command;
         _copy.Text = "Copy command";
+        _commandLabel.Visible = _commandBox.Visible = _copy.Visible = true;
+        _done.Visible = false;
         _help.Visible = setup.Kind == SetupKind.Install;
         _feedback.Text = "";
         _feedback.Visible = false;
@@ -120,22 +115,41 @@ internal sealed class SetupPage : FlowLayoutPanel
         ResumeLayout(true);
     }
 
-    public bool Render(SetupCheckResult result, string? feedback, bool busy, bool checking)
+    public bool Render(SetupCheckResult result, string? feedback, bool busy)
     {
-        var presentation = (result.CanCopy, feedback, busy, checking);
+        feedback = result.IsComplete ? _setup?.SuccessMessage : feedback ?? result.Message;
+        var presentation = (result.IsComplete, result.CanCopy, feedback, busy);
         if (_lastPresentation == presentation) return false;
         _lastPresentation = presentation;
-        _canCopy = result.CanCopy;
-        _copy.Enabled = !busy && _canCopy;
-        _back.Enabled = _check.Enabled = _help.Enabled = !busy;
-        _check.Text = checking ? "Checking…" : _setup?.CheckLabel;
+        var restoreFocus = ContainsFocus;
+        SuspendLayout();
+        if (_complete != result.IsComplete && _setup is not null)
+        {
+            _symbol.Image?.Dispose();
+            _symbol.Image = DrawSymbol(_setup.Kind, result.IsComplete);
+            _copy.Text = "Copy command";
+        }
+        _complete = result.IsComplete;
+        _commandLabel.Visible = _commandBox.Visible = _copy.Visible = !_complete;
+        _help.Visible = !_complete && _setup?.Kind == SetupKind.Install;
+        _done.Visible = _complete;
+        _copy.Enabled = !busy && result.CanCopy && !_complete;
+        _back.Enabled = _done.Enabled = _help.Enabled = !busy;
         _feedback.Text = feedback ?? "";
         _feedback.Visible = !string.IsNullOrWhiteSpace(feedback);
+        _feedback.ForeColor = _complete ? AppTheme.Accent : AppTheme.Muted;
+        _feedback.TextAlign = _complete ? ContentAlignment.MiddleCenter : ContentAlignment.MiddleLeft;
+        _feedback.Margin = _complete ? new Padding(0, 0, 0, (int)Math.Round(24 * DeviceDpi / 96d))
+            : new Padding(0, (int)Math.Round(24 * DeviceDpi / 96d), 0, 0);
+        ResumeLayout(true);
+        // Focus the new action only when this page already owns keyboard focus.
+        // Completion while working in PowerShell must not activate the popup.
+        if (restoreFocus && !ContainsFocus) FocusPrimary();
         return true;
     }
 
     public void MarkCopied() => _copy.Text = "Copied";
-    public void FocusPrimary() { if (!_copy.Focus()) _check.Focus(); }
+    public void FocusPrimary() { if (!(_complete ? _done : _copy).Focus()) _back.Focus(); }
 
     private void OpenHelp()
     {
@@ -161,7 +175,7 @@ internal sealed class SetupPage : FlowLayoutPanel
         ForeColor = AppTheme.Text, Margin = Padding.Empty, UseMnemonic = false
     };
 
-    private static Bitmap DrawSymbol(SetupKind kind)
+    private static Bitmap DrawSymbol(SetupKind kind, bool complete = false)
     {
         var bitmap = new Bitmap(80, 80);
         using var graphics = Graphics.FromImage(bitmap);
@@ -169,7 +183,11 @@ internal sealed class SetupPage : FlowLayoutPanel
         using var background = new SolidBrush(AppTheme.AccentSurface);
         using var pen = new Pen(AppTheme.Accent, 2.6f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         graphics.FillEllipse(background, 0, 0, 79, 79);
-        if (kind == SetupKind.Install)
+        if (complete)
+        {
+            graphics.DrawLines(pen, [new(24, 40), new(35, 51), new(57, 29)]);
+        }
+        else if (kind == SetupKind.Install)
         {
             graphics.DrawLine(pen, 40, 22, 40, 47);
             graphics.DrawLines(pen, [new(31, 39), new(40, 48), new(49, 39)]);

@@ -86,8 +86,8 @@ internal static class MemoryProbe
             Take("idle-" + i);
         }
         timer.Stop();
-        // An explicit refresh waits for any background read before measuring.
-        await context.RefreshAsync(clearError: true);
+        // Join any in-flight read before measuring.
+        await context.RefreshAsync();
         Collect();
         Take("after-gc");
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);

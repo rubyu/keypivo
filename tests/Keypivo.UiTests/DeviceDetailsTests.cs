@@ -45,7 +45,6 @@ internal static class DeviceDetailsTests
 
         var actions = 0;
         popup.SwitchRequested += () => actions++;
-        popup.RefreshRequested += () => actions++;
         info.PerformClick();
         Application.DoEvents();
         Assert(panel.Expanded && info.Selected && actions == 0, "Info must only expand details without issuing a device action");

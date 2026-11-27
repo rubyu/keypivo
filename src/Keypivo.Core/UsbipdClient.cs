@@ -2,7 +2,7 @@ namespace Keypivo.Core;
 
 public class UsbipdException(string message, Exception? innerException = null) : Exception(message, innerException);
 public sealed class UsbipdNotFoundException() : UsbipdException(
-    "usbipd-win was not found. Install it, then refresh the status.\r\n\r\nwinget install --interactive --exact dorssel.usbipd-win");
+    "usbipd-win was not found. Install it to continue.\r\n\r\nwinget install --interactive --exact dorssel.usbipd-win");
 
 public enum UsbipdCommand { Attach, Detach }
 
