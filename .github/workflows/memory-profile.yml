@@ -52,7 +52,7 @@ jobs:
             $heap = ($data.Samples | Where-Object Phase -eq 'after-gc').ManagedHeap / 1MB
             '| {0} | {1:F2} | {2:F2} | {3:F0} | {4:F2} |' -f $variant,$resident,$commit,$handles,$heap >> $env:GITHUB_STEP_SUMMARY
           }
-          'Same tray context, 16 synthetic USB devices, 1,200 accelerated state reads, then 2 minutes at the normal 2-second interval. No USB commands or real device data. Forced GC occurs only at probe boundaries. These short controlled samples do not predict a specific machine’s 25-hour working set.' >> $env:GITHUB_STEP_SUMMARY
+          'Same tray context, 16 synthetic USB devices, 1,200 accelerated state reads, then 2 minutes at the normal 2-second interval. No USB commands or real device data. Forced GC occurs only at probe boundaries. These short controlled samples do not predict the 25-hour working set on a specific computer.' >> $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

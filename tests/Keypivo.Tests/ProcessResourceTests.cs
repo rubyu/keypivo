@@ -17,6 +17,29 @@ internal static class ProcessResourceTests
         foreach (var mode in new[] { "success", "timeout", "cancellation" })
         {
             var count = mode == "success" ? 64 : 16;
+            async Task RunOneAsync()
+            {
+                if (mode == "success")
+                {
+                    await runner.RunAsync(quick, default);
+                    return;
+                }
+                var slow = new CommandRequest(command, ["/d", "/c", "ping -n 5 127.0.0.1 >nul"],
+                    mode == "timeout" ? TimeSpan.FromMilliseconds(200) : TimeSpan.FromSeconds(10));
+                using var cancellation = new CancellationTokenSource();
+                if (mode == "cancellation") cancellation.CancelAfter(200);
+                try
+                {
+                    await runner.RunAsync(slow, cancellation.Token);
+                    throw new Exception($"The {mode} command unexpectedly completed.");
+                }
+                catch (UsbipdException) when (mode == "timeout") { }
+                catch (OperationCanceledException) when (mode == "cancellation" && cancellation.IsCancellationRequested) { }
+            }
+            // Process-tree termination lazily initializes runtime resources too;
+            // exclude that first-use cost from each case's handle budget.
+            await RunOneAsync();
+            await RunOneAsync();
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -27,24 +50,7 @@ internal static class ProcessResourceTests
                 current.Refresh();
                 var before = current.HandleCount;
                 for (var i = 0; i < count; i++)
-                {
-                    if (mode == "success")
-                    {
-                        await runner.RunAsync(quick, default);
-                        continue;
-                    }
-                    var slow = new CommandRequest(command, ["/d", "/c", "ping -n 5 127.0.0.1 >nul"],
-                        mode == "timeout" ? TimeSpan.FromMilliseconds(200) : TimeSpan.FromSeconds(10));
-                    using var cancellation = new CancellationTokenSource();
-                    if (mode == "cancellation") cancellation.CancelAfter(200);
-                    try
-                    {
-                        await runner.RunAsync(slow, cancellation.Token);
-                        throw new Exception($"The {mode} command unexpectedly completed.");
-                    }
-                    catch (UsbipdException) when (mode == "timeout") { }
-                    catch (OperationCanceledException) when (mode == "cancellation" && cancellation.IsCancellationRequested) { }
-                }
+                    await RunOneAsync();
                 await Task.Delay(50);
                 current.Refresh();
                 var growth = current.HandleCount - before;
