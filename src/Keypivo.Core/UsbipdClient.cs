@@ -15,12 +15,21 @@ public interface IUsbipdClient
 public sealed class UsbipdClient(ICommandRunner runner, Func<string>? locateExecutable = null) : IUsbipdClient
 {
     private readonly Func<string> _locateExecutable = locateExecutable ?? LocateExecutable;
+    private CachedState? _cachedState;
+    private sealed record CachedState(string Json, IReadOnlyList<UsbDevice> Devices);
 
     public async Task<IReadOnlyList<UsbDevice>> GetDevicesAsync(CancellationToken cancellationToken)
     {
         var result = await runner.RunAsync(new(_locateExecutable(), ["state"], TimeSpan.FromSeconds(15)), cancellationToken);
         EnsureSuccess(result, "state");
-        return UsbipdStateParser.Parse(result.StandardOutput);
+        // Always query the device. Reuse only the parsed result of an identical,
+        // successful response; changed output and errors still take effect immediately.
+        var cached = Volatile.Read(ref _cachedState);
+        if (cached is not null && string.Equals(cached.Json, result.StandardOutput, StringComparison.Ordinal))
+            return cached.Devices;
+        var devices = Array.AsReadOnly(UsbipdStateParser.Parse(result.StandardOutput).ToArray());
+        Volatile.Write(ref _cachedState, new(result.StandardOutput, devices));
+        return devices;
     }
 
     public async Task ExecuteAsync(UsbipdCommand command, string busId, CancellationToken cancellationToken)

@@ -14,14 +14,18 @@ internal static class MemoryGrowthProbe
 {
     public static int Run(string[] args)
     {
-        if (args.Length != 3 || args[1] is not ("idle" or "json" or "process" or "missing"))
-            throw new ArgumentException("Usage: --memory-growth idle|json|process|missing output.json");
+        if (args.Length is not (3 or 5) || args[1] is not ("idle" or "json" or "process" or "missing"))
+            throw new ArgumentException("Usage: --memory-growth idle|json|process|missing output.json [normalSeconds acceleratedReads]");
+        var normalSeconds = args.Length == 5 ? int.Parse(args[3]) : 120;
+        var acceleratedReads = args.Length == 5 ? int.Parse(args[4]) : 2000;
+        if (normalSeconds is < 10 or > 600 || normalSeconds % 10 != 0 || acceleratedReads is < 200 or > 10000)
+            throw new ArgumentException("Invalid diagnostic workload duration or read count.");
         using var dispatcher = new Control();
         _ = dispatcher.Handle;
         var exitCode = 1;
         dispatcher.BeginInvoke((Action)(async () =>
         {
-            try { await MeasureAsync(args[1], args[2]); exitCode = 0; }
+            try { await MeasureAsync(args[1], args[2], normalSeconds, acceleratedReads); exitCode = 0; }
             catch (Exception error) { Console.Error.WriteLine(error); }
             finally { Application.ExitThread(); }
         }));
@@ -29,7 +33,7 @@ internal static class MemoryGrowthProbe
         return exitCode;
     }
 
-    private static async Task MeasureAsync(string variant, string output)
+    private static async Task MeasureAsync(string variant, string output, int normalSeconds, int acceleratedReads)
     {
         var directory = Path.Combine(Path.GetTempPath(), "keypivo-growth-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -46,6 +50,7 @@ internal static class MemoryGrowthProbe
         var controller = new SwitchController(new UsbipdClient(runner, () => "memory-growth"));
         using var process = Process.GetCurrentProcess();
         var samples = new List<Sample>(50);
+        var latencies = new double[acceleratedReads];
         var clock = Stopwatch.StartNew();
         void Take(string phase)
         {
@@ -59,7 +64,8 @@ internal static class MemoryGrowthProbe
                 GC.GetTotalMemory(false), GC.GetTotalAllocatedBytes(precise: true), gc.TotalCommittedBytes,
                 gc.HeapSizeBytes, gc.FragmentedBytes, process.HandleCount, process.Threads.Count,
                 AppDomain.CurrentDomain.GetAssemblies().Length, GetGuiResources(process.Handle, 0),
-                GetGuiResources(process.Handle, 1), GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2)));
+                GetGuiResources(process.Handle, 1), GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2),
+                process.TotalProcessorTime.TotalMilliseconds, GC.GetTotalPauseDuration().TotalMilliseconds));
         }
 
         Take("before-context");
@@ -77,7 +83,7 @@ internal static class MemoryGrowthProbe
         // Keep the real two-second timer and real render path. idle has exactly
         // the same initialized UI/database/command machinery but no later reads.
         if (variant != "idle") timer.Start();
-        for (var i = 1; i <= 12; i++)
+        for (var i = 1; i <= normalSeconds / 10; i++)
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
             Take("normal-" + i);
@@ -88,14 +94,16 @@ internal static class MemoryGrowthProbe
             await context.RefreshAsync();
             Take("before-accelerated");
             // Compress the read count, not claim that this is elapsed real time.
-            for (var i = 1; i <= 2000; i++)
+            for (var i = 1; i <= acceleratedReads; i++)
             {
+                var started = Stopwatch.GetTimestamp();
                 await context.RefreshAsync();
+                latencies[i - 1] = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
                 if (i % 200 == 0) Take("accelerated-" + i);
             }
             timer.Start();
         }
-        for (var i = 1; i <= 12; i++)
+        for (var i = 1; i <= normalSeconds / 10; i++)
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
             Take("settled-" + i);
@@ -111,7 +119,7 @@ internal static class MemoryGrowthProbe
         Take("after-gc-idle");
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-        File.WriteAllText(output, JsonSerializer.Serialize(new
+        var result = new
         {
             Variant = variant, Runtime = RuntimeInformation.FrameworkDescription,
             OperatingSystem = RuntimeInformation.OSDescription, GCSettings = new
@@ -119,9 +127,21 @@ internal static class MemoryGrowthProbe
                 System.Runtime.GCSettings.IsServerGC, System.Runtime.GCSettings.LatencyMode,
                 HighMemoryLoadThresholdBytes = GC.GetGCMemoryInfo().HighMemoryLoadThresholdBytes
             },
-            DeviceCount = devices.Length, NormalSeconds = 120, AcceleratedReads = variant == "idle" ? 0 : 2000,
-            SettledSeconds = 120, Samples = samples
-        }, new JsonSerializerOptions { WriteIndented = true }));
+            Configuration = GC.GetConfigurationVariables(),
+            DeviceCount = devices.Length, NormalSeconds = normalSeconds, AcceleratedReads = variant == "idle" ? 0 : acceleratedReads,
+            SettledSeconds = normalSeconds, Samples = samples, ReadLatencyMilliseconds = latencies
+        };
+        File.WriteAllText(output, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+        var before = samples.FirstOrDefault(s => s.Phase == "before-accelerated");
+        var after = samples.Last(s => s.Phase == "before-gc");
+        Array.Sort(latencies);
+        Console.WriteLine("GROWTH_RESULT " + JsonSerializer.Serialize(new
+        {
+            result.Runtime, result.Configuration,
+            MeanReadMilliseconds = latencies.Average(), P95ReadMilliseconds = latencies[(int)(latencies.Length * 0.95)],
+            CpuMilliseconds = before is null ? 0 : after.CpuMilliseconds - before.CpuMilliseconds,
+            PauseMilliseconds = before is null ? 0 : after.PauseMilliseconds - before.PauseMilliseconds
+        }));
         // Emit after the final observation so log serialization does not inflate
         // the measured allocation rate or trigger collections during the run.
         foreach (var sample in samples)
@@ -148,7 +168,7 @@ internal static class MemoryGrowthProbe
     private sealed record Sample(string Phase, double Seconds, int Reads, long PrivateWorkingSet,
         long PrivateCommit, long WorkingSet, long ManagedHeap, long TotalAllocated, long GcCommitted,
         long HeapAfterLastGc, long FragmentedAfterLastGc, int Handles, int Threads, int Assemblies,
-        uint GdiObjects, uint UserObjects, int Gen0, int Gen1, int Gen2);
+        uint GdiObjects, uint UserObjects, int Gen0, int Gen1, int Gen2, double CpuMilliseconds, double PauseMilliseconds);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct MemoryCounters
