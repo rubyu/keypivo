@@ -52,11 +52,11 @@ internal static class PollingPresentationTests
         gate = client.BlockNextRead();
         poll = context.RefreshAsync();
         var reads = client.Reads;
-        var manual = context.RefreshAsync(clearError: true);
-        Assert(!action.Enabled && client.Reads == reads, "Manual refresh must wait without overlapping reads");
+        var joined = context.RefreshAsync();
+        Assert(!joined.IsCompleted && action.Enabled && client.Reads == reads, "Repeated polling must join the current read without disabling controls");
         gate.SetResult();
-        Finish(manual);
-        Assert(action.Enabled && client.Reads == reads + 1, "Manual refresh must finish and restore controls");
+        Finish(joined);
+        Assert(action.Enabled && client.Reads == reads, "Joined polling must not start a duplicate read");
 
         client.Key = client.Key with { ClientIPAddress = null, PersistedGuid = null };
         Finish(context.RefreshAsync());
@@ -83,11 +83,11 @@ internal static class PollingPresentationTests
         // Exiting while a read and a user action are pending must cancel cleanly.
         gate = client.BlockNextRead();
         poll = context.RefreshAsync();
-        manual = context.RefreshAsync(clearError: true);
+        action.PerformClick();
         context.ExitThread();
         Finish(poll);
-        Finish(manual);
-        Console.WriteLine("PASS Native polling: stable controls/layout, changed state, queued action, manual refresh, setup Back, and exit.");
+        Assert(client.Commands == 1, "Exiting must cancel the queued action before a USB command is sent");
+        Console.WriteLine("PASS Native polling: stable controls/layout, changed state, queued action, joined reads, setup Back, and exit.");
     }
 
     private static T Find<T>(Control parent, string name) where T : Control =>

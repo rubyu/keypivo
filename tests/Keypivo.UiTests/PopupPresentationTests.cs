@@ -35,7 +35,7 @@ internal static class PopupPresentationTests
         Assert(popup.Visible && popup.IsSetupVisible && !popup.TopMost,
             "Instructions must stay open without covering the user's other window");
 
-        popup.RenderSetup(new(false, true, null), null, false, false);
+        popup.RenderSetup(new(false, true, null), null, false);
         Application.DoEvents();
         Assert(GetForegroundWindow() == other.Handle && !popup.TopMost,
             "Background status checks must not steal focus or raise instructions");

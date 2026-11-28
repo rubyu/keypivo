@@ -7,11 +7,12 @@ namespace Keypivo.UiTests;
 internal static class Program
 {
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        if (args.Contains("--memory-probe")) return MemoryProbe.Run(args);
         // Keep the real Windows UI synchronization context installed between
         // nested DoEvents calls, including across disposable tray contexts.
         using var dispatcher = new Control();
@@ -33,7 +34,9 @@ internal static class Program
             PopupPresentationTests.Run();
             PopupHeaderTests.Run();
             DeviceDetailsTests.Run();
+            CopyableValueTests.Run();
             PollingPresentationTests.Run();
+            AutomaticSetupTests.Run();
             StartupSettingsTests.Run();
             NotificationSettingsTests.Run();
             SettingsRenderingTests.Run();
@@ -52,27 +55,31 @@ internal static class Program
             {
                 var setup = new ManualSetup(kind, kind == SetupKind.Install ? null : key);
                 form.ShowSetup(setup);
-                form.RenderSetup(new(false, true, null), null, false, false);
+                form.RenderSetup(new(false, true, null), null, false);
                 Application.DoEvents();
                 Assert(form.IsSetupVisible && !action.Visible, "Instructions replace the menu");
                 var command = Find<Label>(form, "SetupCommand");
                 Assert(command.Text == setup.Command && command.Visible, "The full command must be visible");
-                Assert(Find<Button>(form, "CheckSetup").Text == setup.CheckLabel, "Instruction page must only check status");
+                Assert(form.Controls.Find("CheckSetup", true).Length == 0, "Instructions must not expose a status-check button");
+                Assert(!Find<Button>(form, "SetupDone").Visible && !Find<Label>(form, "SetupFeedback").Visible,
+                    "Unfinished instructions must not show a completion button or waiting message");
                 Assert(Find<LinkLabel>(form, "InstallationHelp").Visible == (kind == SetupKind.Install), "Installation help visibility");
                 CheckBounds(form);
                 Capture(form, kind.ToString().ToLowerInvariant());
 
-                form.RenderSetup(new(false, false, "Reconnect the same security key, then check again."),
-                    "Reconnect the same security key, then check again.", false, false);
+                form.RenderSetup(new(false, false, "Reconnect the same security key to continue."), null, false);
                 Application.DoEvents();
                 Assert(!Find<Button>(form, "CopyCommand").Enabled, "A stale target must disable copy");
                 Assert(Find<Label>(form, "SetupFeedback").Visible, "Pending confirmation must keep feedback on the page");
                 Assert(form.IsSetupVisible, "Pending confirmation must keep instructions");
                 CheckBounds(form);
 
-                form.RenderSetup(new(true, true, null), null, false, false);
+                form.RenderSetup(new(true, true, null), null, false);
                 Assert(form.IsSetupVisible, "Background polling must not navigate away");
-                Find<Button>(form, "SetupBack").PerformClick();
+                Assert(Find<Button>(form, "SetupDone").Visible && !command.Visible
+                    && Find<Label>(form, "SetupFeedback").Text == setup.SuccessMessage, "Completion must replace the command with success and Done");
+                CaptureScreen(form, kind.ToString().ToLowerInvariant() + "-complete");
+                Find<Button>(form, "SetupDone").PerformClick();
                 Application.DoEvents();
                 Assert(!form.IsSetupVisible && action.Visible, "Returning must show the normal menu");
             }

@@ -12,12 +12,12 @@ internal sealed class StatusForm : Form
     private readonly Label _status;
     private readonly Label _deviceHeading;
     private readonly Button _switch = new PopupButton { Text = "Switch to WSL", Margin = new Padding(24, 0, 24, 0) };
-    private readonly Button _refresh = new PopupButton(PopupGlyph.Refresh) { Name = "RefreshStatus", AccessibleName = "Refresh status", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _settings = new PopupButton(PopupGlyph.Settings) { Name = "OpenSettings", AccessibleName = "Settings", Margin = new Padding(0, 0, 4, 0) };
     private readonly Button _exit = new PopupButton(PopupGlyph.Power) { Name = "ExitApplication", AccessibleName = "Exit Keypivo" };
     private readonly ToolTip _toolTip = new();
-    private readonly PopupButton _info = new(PopupGlyph.Info) { Name = "ToggleDeviceDetails", AccessibleName = "Show all device details", BackColor = AppTheme.Surface };
-    private readonly DeviceDetailsPanel _deviceDetails = new();
+    private readonly PopupButton _info = new(PopupGlyph.Info) { Name = "ToggleDeviceDetails", AccessibleName = "Show all device details", Margin = new Padding(0, 0, 4, 0) };
+    private readonly CopyFeedback _copyFeedback = new();
+    private readonly DeviceDetailsPanel _deviceDetails;
     private bool _sizingDetails;
     private readonly Button _details = MenuButton("View details");
     private Icon? _lastIcon;
@@ -29,19 +29,18 @@ internal sealed class StatusForm : Form
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool KeepOpen { get; set; }
     public event Action? SwitchRequested;
-    public event Action? RefreshRequested;
     public event Action? SettingsRequested;
     public event Action? ExitRequested;
     public event Action? DetailsRequested;
     public event Action? SetupBackRequested;
     public event Action? SetupCopyRequested;
-    public event Action? SetupCheckRequested;
     internal bool IsSetupVisible => _setupPage.Visible;
 
     public StatusForm()
     {
         // Defer the initial DPI pass until every child has its logical bounds.
         SuspendLayout();
+        _deviceDetails = new DeviceDetailsPanel(_copyFeedback);
         Text = "Keypivo";
         Font = new Font("Segoe UI", 12);
         AutoScaleDimensions = new SizeF(96, 96);
@@ -87,7 +86,7 @@ internal sealed class StatusForm : Form
             Name = "HeaderActions", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
             WrapContents = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty
         };
-        tools.Controls.AddRange([_refresh, _settings, _exit]);
+        tools.Controls.AddRange([_info, _settings, _exit]);
         foreach (Control button in tools.Controls) _toolTip.SetToolTip(button, button.AccessibleName);
         header.Controls.Add(brand, 0, 0);
         header.Controls.Add(tools, 1, 0);
@@ -97,27 +96,16 @@ internal sealed class StatusForm : Form
             MinimumSize = new Size(PopupLayout.Width, 0), FlowDirection = FlowDirection.TopDown,
             WrapContents = false, Margin = Padding.Empty, Padding = new Padding(24, 32, 24, 32)
         };
-        var title = new TableLayoutPanel
+        _deviceHeading = new CopyableLabel(_copyFeedback)
         {
-            Name = "DeviceTitle", Width = PopupLayout.ContentWidth, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(PopupLayout.ContentWidth, 0), ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
-        };
-        title.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        title.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _deviceHeading = new Label
-        {
-            Name = "DeviceHeading", Text = "-", Font = new Font(Font.FontFamily, 16, FontStyle.Bold),
-            Width = PopupLayout.ContentWidth - 48, Height = 40, AutoEllipsis = true, UseMnemonic = false,
-            TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 0, 8, 0),
+            Name = "DeviceHeading", Text = "-", Font = new Font(Font.FontFamily, 14, FontStyle.Bold),
+            Width = PopupLayout.ContentWidth, Height = 40, AutoEllipsis = true,
+            TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty,
             Anchor = AnchorStyles.Top | AnchorStyles.Left
         };
         _deviceHeading.FontChanged += (_, _) => SizeDeviceHeading();
         _deviceHeading.SizeChanged += (_, _) => SizeDeviceHeading();
-        _info.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        title.Controls.Add(_deviceHeading, 0, 0);
-        title.Controls.Add(_info, 1, 0);
-        state.Controls.Add(title);
-        _toolTip.SetToolTip(_info, _info.AccessibleName);
+        state.Controls.Add(_deviceHeading);
         _status = new Label
         {
             Name = "ConnectionStatus", Text = "Checking…", AutoSize = true, MaximumSize = new Size(PopupLayout.ContentWidth, 0),
@@ -132,7 +120,6 @@ internal sealed class StatusForm : Form
         Controls.AddRange([_layout, _setupPage]);
 
         _switch.Click += (_, _) => SwitchRequested?.Invoke();
-        _refresh.Click += (_, _) => RefreshRequested?.Invoke();
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
         _exit.Click += (_, _) => ExitRequested?.Invoke();
         _details.Click += (_, _) => DetailsRequested?.Invoke();
@@ -145,14 +132,20 @@ internal sealed class StatusForm : Form
         };
         _setupPage.BackRequested += () => SetupBackRequested?.Invoke();
         _setupPage.CopyRequested += () => SetupCopyRequested?.Invoke();
-        _setupPage.CheckRequested += () => SetupCheckRequested?.Invoke();
         Deactivate += (_, _) =>
         {
             // Instructions may stay open behind PowerShell, but must not remain above it.
             TopMost = false;
             if (!KeepOpen && !IsSetupVisible) Hide();
         };
-        VisibleChanged += (_, _) => { if (!Visible) TopMost = false; };
+        VisibleChanged += (_, _) =>
+        {
+            if (!Visible)
+            {
+                TopMost = false;
+                _copyFeedback.Hide();
+            }
+        };
         SizeChanged += (_, _) => { if (Visible) Place(); };
         ResumeLayout(true);
     }
@@ -166,13 +159,11 @@ internal sealed class StatusForm : Form
         var description = snapshot.Device?.Description;
         _deviceHeading.Text = string.IsNullOrWhiteSpace(description) ? "-" : description;
         SizeDeviceHeading();
-        _toolTip.SetToolTip(_deviceHeading, _deviceHeading.Text);
         _status.Text = busy ? "Switching…" : StatePresentation.Title(snapshot.State);
         _switch.Text = busy ? "Switching…" : snapshot.State == ConnectionState.ToolMissing ? "Set up…"
             : snapshot.Device?.IsAttached == true ? "Switch to Windows"
             : snapshot.Device is { IsShared: false } ? "Set up for WSL…" : "Switch to WSL";
         _switch.Enabled = !busy && !refreshing && (snapshot.CanOperate || snapshot.State == ConnectionState.ToolMissing);
-        _refresh.Enabled = !busy && !refreshing;
         _settings.Enabled = !busy && !refreshing;
         _exit.Enabled = !busy;
         _details.Visible = snapshot.State != ConnectionState.ToolMissing && !string.IsNullOrEmpty(error ?? snapshot.Error);
@@ -209,9 +200,9 @@ internal sealed class StatusForm : Form
         if (Visible) { Place(); _switch.Focus(); }
     }
 
-    public void RenderSetup(SetupCheckResult result, string? feedback, bool busy, bool checking)
+    public void RenderSetup(SetupCheckResult result, string? feedback, bool busy)
     {
-        if (!_setupPage.Render(result, feedback, busy, checking)) return;
+        if (!_setupPage.Render(result, feedback, busy)) return;
         PerformLayout();
         if (Visible) Place();
     }
@@ -230,7 +221,7 @@ internal sealed class StatusForm : Form
         BringToFront();
         Activate();
         if (IsSetupVisible) _setupPage.FocusPrimary();
-        else if (!_switch.Focus()) _refresh.Focus();
+        else if (!_switch.Focus()) _info.Focus();
     }
 
     private void Place()
@@ -246,7 +237,7 @@ internal sealed class StatusForm : Form
         var preferred = _deviceHeading.GetPreferredSize(new Size(_deviceHeading.Width, 0)).Height;
         var threeLines = TextRenderer.MeasureText("Ag\nAg\nAg", _deviceHeading.Font,
             new Size(_deviceHeading.Width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
-        _deviceHeading.Height = Math.Max(_info.Height, Math.Min(preferred, threeLines));
+        _deviceHeading.Height = Math.Min(preferred, threeLines);
     }
 
     protected override void OnLayout(LayoutEventArgs levent)
@@ -304,6 +295,7 @@ internal sealed class StatusForm : Form
         if (disposing)
         {
             _toolTip.Dispose();
+            _copyFeedback.Dispose();
             _logo.Image?.Dispose();
         }
         base.Dispose(disposing);

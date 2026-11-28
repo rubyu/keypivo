@@ -41,8 +41,12 @@ public sealed class ProcessCommandRunner : ICommandRunner
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(request.Timeout);
-        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+        // Accessing these readers transfers disposal responsibility to us:
+        // Process.Dispose leaves directly accessed streams open.
+        using var outputReader = process.StandardOutput;
+        using var errorReader = process.StandardError;
+        var stdout = outputReader.ReadToEndAsync(timeout.Token);
+        var stderr = errorReader.ReadToEndAsync(timeout.Token);
         try
         {
             await process.WaitForExitAsync(timeout.Token);
@@ -56,7 +60,7 @@ public sealed class ProcessCommandRunner : ICommandRunner
             try { await Task.WhenAll(stdout, stderr); }
             catch (OperationCanceledException) { }
             if (cancellationToken.IsCancellationRequested) throw;
-            throw new UsbipdException("usbipd timed out. Refresh the status before trying again.");
+            throw new UsbipdException("usbipd timed out. Status checks will continue automatically.");
         }
     }
 }
