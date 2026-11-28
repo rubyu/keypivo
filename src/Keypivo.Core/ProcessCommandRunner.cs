@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Buffers;
 using System.Diagnostics;
 using System.Text;
 
@@ -45,8 +46,8 @@ public sealed class ProcessCommandRunner : ICommandRunner
         // Process.Dispose leaves directly accessed streams open.
         using var outputReader = process.StandardOutput;
         using var errorReader = process.StandardError;
-        var stdout = outputReader.ReadToEndAsync(timeout.Token);
-        var stderr = errorReader.ReadToEndAsync(timeout.Token);
+        var stdout = ReadOutputAsync(outputReader, timeout.Token);
+        var stderr = ReadOutputAsync(errorReader, timeout.Token);
         try
         {
             await process.WaitForExitAsync(timeout.Token);
@@ -62,5 +63,30 @@ public sealed class ProcessCommandRunner : ICommandRunner
             if (cancellationToken.IsCancellationRequested) throw;
             throw new UsbipdException("usbipd timed out. Status checks will continue automatically.");
         }
+    }
+
+    private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        // Typical state output fits in one rented buffer. In particular, empty
+        // stderr should not allocate a StringBuilder backing array on every poll.
+        var buffer = ArrayPool<char>.Shared.Rent(4096);
+        var length = 0;
+        try
+        {
+            while (true)
+            {
+                if (length == buffer.Length)
+                {
+                    var larger = ArrayPool<char>.Shared.Rent(checked(buffer.Length * 2));
+                    buffer.AsSpan(0, length).CopyTo(larger);
+                    ArrayPool<char>.Shared.Return(buffer, clearArray: true);
+                    buffer = larger;
+                }
+                var read = await reader.ReadAsync(buffer.AsMemory(length), cancellationToken).ConfigureAwait(false);
+                if (read == 0) return length == 0 ? "" : new string(buffer, 0, length);
+                length += read;
+            }
+        }
+        finally { ArrayPool<char>.Shared.Return(buffer, clearArray: true); }
     }
 }

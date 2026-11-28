@@ -12,6 +12,7 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        if (args.Contains("--memory-growth")) return MemoryGrowthProbe.Run(args);
         if (args.Contains("--memory-probe")) return MemoryProbe.Run(args);
         // Keep the real Windows UI synchronization context installed between
         // nested DoEvents calls, including across disposable tray contexts.
@@ -31,6 +32,8 @@ internal static class Program
     {
         try
         {
+            Assert(Convert.ToUInt64(GC.GetConfigurationVariables()["GCHeapHardLimit"]) == 64UL * 1024 * 1024,
+                "Native UI checks must run under the application's 64 MiB managed-heap policy");
             PopupPresentationTests.Run();
             PopupHeaderTests.Run();
             DeviceDetailsTests.Run();

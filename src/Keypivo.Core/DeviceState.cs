@@ -18,7 +18,28 @@ public enum ConnectionState
 
 public sealed partial record UsbDevice
 {
-    [JsonRequired] public string InstanceId { get; init; } = "";
+    private string _instanceId = "";
+    private string _vendorId = "";
+    private string _productId = "";
+
+    [JsonRequired]
+    public string InstanceId
+    {
+        get => _instanceId;
+        init
+        {
+            _instanceId = value;
+            _vendorId = _productId = "";
+            var id = value.AsSpan();
+            if (id.Length < 21 || !id.StartsWith(@"USB\VID_", StringComparison.OrdinalIgnoreCase)
+                || !id.Slice(12, 5).Equals("&PID_", StringComparison.OrdinalIgnoreCase)
+                || id.Slice(8, 4).IndexOfAnyExcept("0123456789abcdefABCDEF") >= 0
+                || id.Slice(17, 4).IndexOfAnyExcept("0123456789abcdefABCDEF") >= 0
+                || (id.Length > 21 && id[21] is not ('&' or '\\'))) return;
+            _vendorId = id.Slice(8, 4).ToString().ToUpperInvariant();
+            _productId = id.Slice(17, 4).ToString().ToUpperInvariant();
+        }
+    }
     [JsonRequired] public string? BusId { get; init; }
     [JsonRequired] public Guid? PersistedGuid { get; init; }
     [JsonRequired] public string? ClientIPAddress { get; init; }
@@ -26,13 +47,10 @@ public sealed partial record UsbDevice
     public bool IsForced { get; init; }
 
     [JsonIgnore] public bool IsConnected => BusId is not null && BusIdPattern().IsMatch(BusId);
-    [JsonIgnore] public string VendorId => HardwareIdPattern().Match(InstanceId ?? "").Groups[1].Value.ToUpperInvariant();
+    [JsonIgnore] public string VendorId => _vendorId;
     [JsonIgnore] public bool IsShared => PersistedGuid.HasValue;
     [JsonIgnore] public bool IsAttached => !string.IsNullOrWhiteSpace(ClientIPAddress);
-    [JsonIgnore] public string ProductId => HardwareIdPattern().Match(InstanceId ?? "").Groups[2].Value.ToUpperInvariant();
-
-    [GeneratedRegex(@"\AUSB\\VID_([0-9A-F]{4})&PID_([0-9A-F]{4})(?:[&\\]|\z)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex HardwareIdPattern();
+    [JsonIgnore] public string ProductId => _productId;
 
     [GeneratedRegex(@"\A[1-9][0-9]*-[1-9][0-9]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex BusIdPattern();
@@ -47,10 +65,18 @@ public sealed record DeviceSnapshot(ConnectionState State, UsbDevice? Device, in
     {
         // Keep usbipd's enumeration order; never select a disconnected persisted entry.
         filter ??= DeviceFilter.Default;
-        var matches = devices.Where(d => d.IsConnected && filter.Matches(d)).ToArray();
-        // A switch follows its original device even if enumeration order changes.
-        var device = target is null ? matches.FirstOrDefault() : matches.FirstOrDefault(d =>
-            string.Equals(d.InstanceId, target.InstanceId, StringComparison.OrdinalIgnoreCase) && d.BusId == target.BusId);
+        UsbDevice? device = null;
+        var matchingCount = 0;
+        for (var i = 0; i < devices.Count; i++)
+        {
+            var candidate = devices[i];
+            if (!candidate.IsConnected || !filter.Matches(candidate)) continue;
+            matchingCount++;
+            // A switch follows its original device even if enumeration order changes.
+            if (device is null && (target is null ||
+                (string.Equals(candidate.InstanceId, target.InstanceId, StringComparison.OrdinalIgnoreCase)
+                    && candidate.BusId == target.BusId))) device = candidate;
+        }
         var state = device switch
         {
             null => ConnectionState.NotConnected,
@@ -59,7 +85,7 @@ public sealed record DeviceSnapshot(ConnectionState State, UsbDevice? Device, in
             { IsShared: true } => ConnectionState.WindowsShared,
             _ => ConnectionState.WindowsUnshared
         };
-        return new(state, device, matches.Length);
+        return new(state, device, matchingCount);
     }
 }
 
