@@ -18,6 +18,12 @@ try {
         if ($required -cnotin $names) { throw "Package is missing: $required" }
     }
     if (@($names | Where-Object { $_ -match '(^|/)(YSwitch|Y-Switch)' }).Count -gt 0) { throw 'Obsolete binaries found in MSIX.' }
+    $runtimeEntry = $archive.Entries | Where-Object FullName -eq 'keypivo.runtimeconfig.json' | Select-Object -First 1
+    $reader = [IO.StreamReader]::new($runtimeEntry.Open())
+    try { $runtime = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+    if ($runtime.runtimeOptions.configProperties.'System.GC.HeapHardLimit' -ne 67108864) {
+        throw 'The package must carry the tested 64 MiB managed-heap policy.'
+    }
     $manifestEntry = $archive.Entries | Where-Object FullName -eq 'AppxManifest.xml' | Select-Object -First 1
     $reader = [IO.StreamReader]::new($manifestEntry.Open())
     try { [xml]$manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
@@ -57,5 +63,5 @@ try {
             finally { $image.Dispose() }
         } finally { $stream.Dispose() }
     }
-    Write-Output 'MSIX verification passed: identity, entry point, runtime, license, capabilities, sign-in startup, and logos.'
+    Write-Output 'MSIX verification passed: identity, entry point, runtime, memory policy, license, capabilities, sign-in startup, and logos.'
 } finally { $archive.Dispose() }

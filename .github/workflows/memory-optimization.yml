@@ -2,6 +2,11 @@ name: Memory optimization comparison
 
 on:
   workflow_dispatch:
+    inputs:
+      include_candidates:
+        description: Also compare allocation-only and conservative-GC candidates
+        type: boolean
+        default: false
   pull_request:
     branches: [develop]
     paths:
@@ -52,7 +57,10 @@ jobs:
           dotnet publish tests/Keypivo.UiTests -c Release -r win-x64 --self-contained true -m:1 -p:UseSharedCompilation=false -o artifacts/memory-optimization/fixed
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compare allocations and GC settings on the same runner
-        run: ./scripts/compare-memory.ps1 -Repeat ${{ matrix.repeat }}
+        env:
+          INCLUDE_CANDIDATES: ${{ github.event_name == 'workflow_dispatch' && inputs.include_candidates }}
+        run: |
+          ./scripts/compare-memory.ps1 -Repeat ${{ matrix.repeat }} -IncludeCandidates:($env:INCLUDE_CANDIDATES -eq 'true')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

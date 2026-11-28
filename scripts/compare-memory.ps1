@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidateSet(1, 2)][int]$Repeat = 1)
+param([ValidateSet(1, 2)][int]$Repeat = 1, [switch]$IncludeCandidates)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -8,7 +8,7 @@ $resultRoot = Join-Path $comparisonRoot 'results'
 New-Item -ItemType Directory -Path $resultRoot -Force | Out-Null
 $runtimePath = Join-Path $comparisonRoot 'fixed/keypivo.uitests.runtimeconfig.json'
 $originalConfig = Get-Content -LiteralPath $runtimePath -Raw
-$cases = @('baseline', 'allocations', 'conserve', 'limit64')
+$cases = if ($IncludeCandidates) { @('baseline', 'allocations', 'conserve', 'limit64') } else { @('baseline', 'limit64') }
 if ($Repeat -eq 2) { [array]::Reverse($cases) }
 $summaries = @()
 try {

@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup>
+    <!-- Bound the managed heap and GC bookkeeping for this small resident app.
+         This is not a working-set target or an upfront reservation, and does
+         not impose a limit on native WinForms/GDI memory. -->
+    <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimit" Value="67108864" />
+  </ItemGroup>
+</Project>
