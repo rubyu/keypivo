@@ -12,6 +12,7 @@ internal static class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        if (args.Contains("--memory-growth")) return MemoryGrowthProbe.Run(args);
         if (args.Contains("--memory-probe")) return MemoryProbe.Run(args);
         // Keep the real Windows UI synchronization context installed between
         // nested DoEvents calls, including across disposable tray contexts.

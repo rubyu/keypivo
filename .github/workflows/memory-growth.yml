@@ -1,0 +1,48 @@
+name: Memory growth investigation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [develop]
+    paths:
+      - tests/Keypivo.UiTests/MemoryGrowthProbe.cs
+      - .github/workflows/memory-growth.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-growth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [idle, json, process, missing]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build diagnostic tray
+        run: dotnet build tests/Keypivo.UiTests -c Release -m:1 -p:UseSharedCompilation=false
+      - name: Measure from initialization without forced GC
+        run: |
+          dotnet run --project tests/Keypivo.UiTests -c Release --no-build -- --memory-growth '${{ matrix.variant }}' 'artifacts/memory-growth/${{ matrix.variant }}.json'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: memory-growth-${{ matrix.variant }}-${{ github.sha }}
+          path: artifacts/memory-growth/*.json
+          if-no-files-found: warn
+          retention-days: 30
