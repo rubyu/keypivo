@@ -13,6 +13,12 @@ if (args.Contains("--sleep"))
     await Task.Delay(TimeSpan.FromSeconds(30));
     return 0;
 }
+if (args.Contains("--emit-unicode"))
+{
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    Console.Write(string.Concat(Enumerable.Repeat("日本語 🔑\r\n", 10000)));
+    return 0;
+}
 
 var tests = new (string Name, Func<Task> Run)[]
 {
@@ -220,6 +226,13 @@ var tests = new (string Name, Func<Task> Run)[]
         Equal(128 * 1024, result.StandardError.Length);
     }),
     ("Process: streams are released before GC on success, timeout and cancellation", ProcessResourceTests.RunAsync),
+    ("Process: pooled output preserves Unicode across buffer growth and empty stderr", async () =>
+    {
+        var result = await new ProcessCommandRunner().RunAsync(ChildRequest("--emit-unicode", TimeSpan.FromSeconds(10)), default);
+        Equal(0, result.ExitCode);
+        Equal(string.Concat(Enumerable.Repeat("日本語 🔑\r\n", 10000)), result.StandardOutput);
+        Equal("", result.StandardError);
+    }),
     ("Process: timeout and explicit cancellation terminate the wait", async () =>
     {
         var runner = new ProcessCommandRunner();
@@ -230,7 +243,7 @@ var tests = new (string Name, Func<Task> Run)[]
 };
 
 var failures = 0;
-var allTests = tests.Concat(SettingsTests.All).Concat(NotificationSettingsTests.All).Concat(SwitchVerificationTests.All).Concat(ManualSetupTests.All).Concat(DeviceDetailsTests.All).ToArray();
+var allTests = tests.Concat(SettingsTests.All).Concat(NotificationSettingsTests.All).Concat(SwitchVerificationTests.All).Concat(ManualSetupTests.All).Concat(DeviceDetailsTests.All).Concat(PollingAllocationTests.All).ToArray();
 foreach (var test in allTests)
 {
     try { await test.Run(); Console.WriteLine($"PASS {test.Name}"); }
