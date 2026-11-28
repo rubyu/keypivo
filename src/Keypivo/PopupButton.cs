@@ -3,7 +3,7 @@ using System.Drawing.Drawing2D;
 
 namespace Keypivo;
 
-internal enum PopupGlyph { Refresh, Settings, Power, Info }
+internal enum PopupGlyph { Back, Settings, Power, Info }
 
 // Native Button behavior (keyboard, accessibility, disabled actions) with
 // DPI-independent artwork that does not depend on an installed icon font.
@@ -59,14 +59,11 @@ internal sealed class PopupButton : Button
         Color fill;
         if (_glyph.HasValue)
         {
-            fill = active ? AppTheme.Hover : BackColor;
-            if (active) foreground = AppTheme.Text;
-            if (Selected)
-            {
-                foreground = AppTheme.Accent;
-                fill = AppTheme.AccentSurface;
-            }
-            if (active && _glyph == PopupGlyph.Power)
+            var hovered = Enabled && _hovered;
+            fill = hovered ? AppTheme.IconHover : BackColor;
+            if (hovered) foreground = AppTheme.Text;
+            if (Selected && Enabled) foreground = AppTheme.Accent;
+            if (hovered && _glyph == PopupGlyph.Power)
             {
                 foreground = AppTheme.Error;
                 fill = AppTheme.ErrorSurface;
@@ -106,11 +103,9 @@ internal sealed class PopupButton : Button
     {
         switch (glyph)
         {
-            case PopupGlyph.Refresh:
-                graphics.DrawArc(pen, 4, 4, 16, 16, 220, 140);
-                graphics.DrawLines(pen, [new PointF(20, 6), new PointF(20, 12), new PointF(14, 12)]);
-                graphics.DrawArc(pen, 4, 4, 16, 16, 40, 140);
-                graphics.DrawLines(pen, [new PointF(4, 18), new PointF(4, 12), new PointF(10, 12)]);
+            case PopupGlyph.Back:
+                graphics.DrawLines(pen, [new PointF(11, 5), new PointF(4, 12), new PointF(11, 19)]);
+                graphics.DrawLine(pen, 4, 12, 21, 12);
                 break;
             case PopupGlyph.Settings:
                 var points = Enumerable.Range(0, 32).Select(i =>

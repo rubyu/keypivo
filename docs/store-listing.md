@@ -27,7 +27,7 @@ Keypivo runs as a standard-user desktop application and declares `runFullTrust`.
 
 The app uses the separately installed usbipd-win tool to read device state and run `attach --wsl` and `detach` at normal user privileges. Installation, `bind`, and `unbind` are performed manually by the user outside Keypivo. Setup pages show the required commands and offer clipboard copying and read-only status checks. Keypivo does not execute these setup commands or open an administrator terminal.
 
-After completing each manual step, select **Check installation** or **Check status**. A confirmed result returns to the normal tray menu. An incomplete step keeps its instructions visible. Normal Windows/WSL switching is available from the menu after the key is shared.
+Keypivo checks each manual step automatically. A confirmed result shows a success message and **Done**, which returns to the normal tray menu without running a USB command. An incomplete step keeps its instructions visible. Normal Windows/WSL switching is available from the menu after the key is shared.
 
 Testing requires Windows, usbipd-win, a running WSL2 distribution, and a USB security key. Default matching uses VID 1050 with no PID restriction; the IDs can be changed in Settings. The device is exclusively available to Windows or to the USB-IP client. The application only manages USB ownership; it does not implement OpenPGP or SSH authentication.
 

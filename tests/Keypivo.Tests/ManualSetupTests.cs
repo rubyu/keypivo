@@ -14,6 +14,7 @@ internal static class ManualSetupTests
             var result = await controller.CheckSetupAsync(required.Setup);
             Equal(false, result.IsComplete);
             Equal(true, result.CanCopy);
+            Equal<string?>(null, result.Message);
             Equal(0, fake.Commands.Count);
         }),
         ("Setup: installation completes without a connected key and returns current device state", async () =>
@@ -45,6 +46,7 @@ internal static class ManualSetupTests
             var pending = await controller.CheckSetupAsync(required.Setup);
             Equal(false, pending.IsComplete);
             Equal(true, pending.CanCopy);
+            Equal<string?>(null, pending.Message);
             fake.Devices = [Key(shared: true)];
             Equal(true, (await controller.CheckSetupAsync(required.Setup)).IsComplete);
             Equal(ConnectionState.WindowsShared, controller.Current.State);
@@ -91,6 +93,7 @@ internal static class ManualSetupTests
             var shared = await controller.CheckSetupAsync(setup);
             Equal(true, shared.CanCopy);
             Equal(false, shared.IsComplete);
+            Equal<string?>(null, shared.Message);
             fake.Devices = [Key() with { IsForced = true }];
             Equal(false, (await controller.CheckSetupAsync(setup)).IsComplete);
             fake.Devices = [];

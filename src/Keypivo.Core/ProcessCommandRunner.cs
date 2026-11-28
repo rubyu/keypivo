@@ -60,7 +60,7 @@ public sealed class ProcessCommandRunner : ICommandRunner
             try { await Task.WhenAll(stdout, stderr); }
             catch (OperationCanceledException) { }
             if (cancellationToken.IsCancellationRequested) throw;
-            throw new UsbipdException("usbipd timed out. Refresh the status before trying again.");
+            throw new UsbipdException("usbipd timed out. Status checks will continue automatically.");
         }
     }
 }
